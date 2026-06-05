@@ -42,6 +42,12 @@ _DSS_STATUS_TIER = {
     "inactive": "none",
 }
 
+_DSS_ITEM_MIX_MAP = {
+    3608481516: "Req Slips",
+    2985106497: "Rare Samples",
+    3992382197: "Common Samples",
+}
+
 
 def _load_planet_index_to_name():
     with open(os.path.join("data", "planets.json")) as f:
@@ -107,6 +113,39 @@ def format_duration(hours):
     if mins or not parts:
         parts.append(f"{mins}min")
     return " ".join(parts)
+
+
+def _format_lib_time(hours):
+    if hours is None:
+        return "Establishing a Beachhead"
+    return format_duration(hours)
+
+
+def _format_defense_time(planet):
+    """For defense planets: compare measured lib_time to event end.
+
+    Returns (label, value) tuple. label is None for outcome lines (winning/losing)
+    so callers emit value as a standalone line with no prefix.
+    - lib_time < event_remaining → winning → "Planet Defended in X"
+    - lib_time > event_remaining → losing  → "Lost in X"
+    - lib_time is None           → unknown → "Time to Defense: Establishing a Beachhead"
+    """
+    lib_time = planet.get("liberation_time_hours")
+    event = planet.get("event") or {}
+    event_remaining = _time_remaining_hours(event.get("end_time"))
+    if lib_time is None:
+        return ("Time to Defense", "Establishing a Beachhead")
+    if event_remaining is not None and lib_time > event_remaining:
+        return (None, f"Lost in {format_duration(event_remaining)}")
+    return (None, f"Planet Defended in {format_duration(lib_time)}")
+
+
+def _format_region_status(region):
+    """Status string for a region.
+    Secure only when 0% cleared AND no active players — otherwise lib time or beachhead."""
+    if not region.get("progress_pct") and not region.get("players", 0):
+        return "Secure"
+    return _format_lib_time(region.get("liberation_time_hours"))
 
 
 # FUTURE: replace with classify_items_web() for web UI, same input/output shape
@@ -244,61 +283,88 @@ def _format_hazard_video(hazard, classifications):
     return f"{transform(hazard['name'])} — {hazard['description']}"
 
 
+def _dss_cost_label(action):
+    """Returns the resource type label (e.g. 'Req Slips') for a DSS action, or empty string."""
+    fps = action.get("funding_progress", [])
+    if fps:
+        item_id = fps[0].get("item_mix_id")
+        return _DSS_ITEM_MIX_MAP.get(item_id, "")
+    return ""
+
+
+def _dss_status_phrase(action):
+    """Returns the status + timing phrase for a DSS tactical action."""
+    status = action["status_label"]
+    expire = action.get("status_expire")
+    fps = action.get("funding_progress", [])
+
+    if status == "funding":
+        phrase = "Accruing Donations"
+        if fps:
+            fp = fps[0]
+            remaining_units = fp["target"] - fp["current"]
+            if fp["delta_per_second"] > 0:
+                eta = format_duration((remaining_units / fp["delta_per_second"]) / 3600)
+                phrase += f", Ready in {eta}"
+        return phrase
+    if status == "active":
+        phrase = "Active"
+        if expire:
+            hrs = _time_remaining_hours(expire)
+            if hrs and hrs > 0:
+                phrase += f", Active for {format_duration(hrs)}"
+        return phrase
+    if status == "cooldown":
+        phrase = "On Cooldown"
+        if expire:
+            hrs = _time_remaining_hours(expire)
+            if hrs and hrs > 0:
+                phrase += f", Available for donations in {format_duration(hrs)}"
+        return phrase
+    return status.title()
+
+
 def _format_dss_discord(dss):
     """Returns a list of Discord-formatted lines for the DSS section."""
     lines = []
-    lines.append("**DEMOCRATIC SPACE STATION**")
-    lines.append(f"> **Location:** {dss['planet_name']}")
+    lines.append("**DSS UPDATE**")
+    ftl_str = ""
     if dss.get("election_end"):
-        remaining = _time_remaining_hours(dss["election_end"])
-        lines.append(f"> **Next FTL Jump:** {format_duration(remaining)}")
-    lines.append("> **Tactical Actions:**")
+        hrs = _time_remaining_hours(dss["election_end"])
+        if hrs and hrs > 0:
+            ftl_str = f" ({format_duration(hrs)} until FTL jump)"
+    lines.append(f"**Location:** {dss['planet_name']}{ftl_str}")
+    lines.append("")
     for action in dss["tactical_actions"]:
-        tier = _DSS_STATUS_TIER.get(action["status_label"], "none")
-        prefix, suffix = _TIER_DISCORD.get(tier, ("", ""))
+        cost = _dss_cost_label(action)
+        cost_str = f" ({cost})" if cost else ""
+        phrase = _dss_status_phrase(action)
         desc = _strip_html(action["strategic_description"])
-        desc_fmt = f"{prefix}{desc}{suffix}" if prefix else f"*{desc}*"
-        status = action["status_label"]
-        expire_str = ""
-        if status == "cooldown" and action.get("status_expire"):
-            remaining = _time_remaining_hours(action["status_expire"])
-            expire_str = f" | Time remaining: {format_duration(remaining)}"
-        lines.append(f"> **{action['name']}** ({status.upper()}){expire_str}")
-        lines.append(f">   {desc_fmt}")
-        for fp in action.get("funding_progress", []):
-            lines.append(
-                f">   Funding: {fp['current']:.0f} / {fp['target']:.0f}"
-                f" (+{fp['delta_per_second']:.4f}/sec)"
-            )
+        lines.append(f"**{action['name']}**{cost_str} — {phrase}")
+        if desc:
+            lines.append(f"│ *{desc}*")
     return lines
 
 
 def _format_dss_video(dss):
     """Returns a list of plain-text lines for the DSS section."""
     lines = []
-    lines.append("    DEMOCRATIC SPACE STATION")
-    lines.append(f"    Location: {dss['planet_name']}")
+    lines.append("DSS UPDATE")
+    ftl_str = ""
     if dss.get("election_end"):
-        remaining = _time_remaining_hours(dss["election_end"])
-        lines.append(f"    Next FTL Jump: {format_duration(remaining)}")
-    lines.append("    Tactical Actions:")
+        hrs = _time_remaining_hours(dss["election_end"])
+        if hrs and hrs > 0:
+            ftl_str = f" ({format_duration(hrs)} until FTL jump)"
+    lines.append(f"Location: {dss['planet_name']}{ftl_str}")
+    lines.append("")
     for action in dss["tactical_actions"]:
-        tier = _DSS_STATUS_TIER.get(action["status_label"], "none")
-        transform = _TIER_VIDEO_TRANSFORM.get(tier, str.title)
+        cost = _dss_cost_label(action)
+        cost_str = f" ({cost})" if cost else ""
+        phrase = _dss_status_phrase(action)
         desc = _strip_html(action["strategic_description"])
-        status = action["status_label"]
-        status_fmt = status.upper() if status in ("active", "cooldown") else status
-        expire_str = ""
-        if status == "cooldown" and action.get("status_expire"):
-            remaining = _time_remaining_hours(action["status_expire"])
-            expire_str = f" | Time remaining: {format_duration(remaining)}"
-        lines.append(f"      {transform(action['name'])} — {status_fmt}{expire_str}")
-        lines.append(f"        {desc}")
-        for fp in action.get("funding_progress", []):
-            lines.append(
-                f"        Funding: {fp['current']:.0f} / {fp['target']:.0f}"
-                f" (+{fp['delta_per_second']:.4f}/sec)"
-            )
+        lines.append(f"{action['name']}{cost_str} — {phrase}")
+        if desc:
+            lines.append(f"  {desc}")
     return lines
 
 
@@ -355,14 +421,20 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
             lines.append(f"**{planet['name']}**{dss_tag}")
 
             progress_label = "Defense Progress" if is_def else "Liberation Progress"
-            time_label = "Time to defense" if is_def else "Time to liberation"
 
             lines.append(f"> **Sector:** {planet['sector']} | **Biome:** {planet['biome']}")
             campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")
             lines.append(f"> **Campaign Level:** {planet['campaign_level']} | **Type:** {campaign_type_label}")
             lines.append(f"> **Players:** {planet['player_count']:,}")
             lines.append(f"> **{progress_label}:** {planet['progress_pct']}%")
-            lines.append(f"> **{time_label}:** {format_duration(planet['liberation_time_hours'])}")
+            if is_def:
+                d_label, d_time = _format_defense_time(planet)
+                if d_label:
+                    lines.append(f"> **{d_label}:** {d_time}")
+                else:
+                    lines.append(f"> {d_time}")
+            else:
+                lines.append(f"> **Time to Liberation:** {_format_lib_time(planet['liberation_time_hours'])}")
             lines.append(f"> **Regen/sec:** {planet['regen_per_second']:.2f}")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
@@ -370,6 +442,15 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                 lines.append("> **Hazards:**")
                 for hazard in hazards:
                     lines.append(f"> {_format_hazard_discord(hazard, classifications)}")
+
+            active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0]
+            if active_regions:
+                lines.append("> **Population Centers:**")
+                for r in active_regions:
+                    pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
+                    size = f"{r['size']} — " if r.get("size") else ""
+                    status = _format_region_status(r)
+                    lines.append(f"> - **{r['name']}** ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
 
             # EXOSTORM — remove this block if mechanic is retired
             if planet.get("exostorm"):
@@ -459,14 +540,20 @@ def format_video(parsed_data, classifications, flavor_texts=None):
             lines.append(MINOR_SEP)
 
             progress_label = "Defense Progress" if is_def else "Liberation Progress"
-            time_label = "Time to defense" if is_def else "Time to liberation"
 
             lines.append(f"    Sector: {planet['sector']} | Biome: {planet['biome']}")
             campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")
             lines.append(f"    Campaign Level: {planet['campaign_level']} | Type: {campaign_type_label}")
             lines.append(f"    Players: {planet['player_count']:,}")
             lines.append(f"    {progress_label}: {planet['progress_pct']}%")
-            lines.append(f"    {time_label}: {format_duration(planet['liberation_time_hours'])}")
+            if is_def:
+                d_label, d_time = _format_defense_time(planet)
+                if d_label:
+                    lines.append(f"    {d_label}: {d_time}")
+                else:
+                    lines.append(f"    {d_time}")
+            else:
+                lines.append(f"    Time to Liberation: {_format_lib_time(planet['liberation_time_hours'])}")
             lines.append(f"    Regen/sec: {planet['regen_per_second']:.2f}")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
@@ -474,6 +561,15 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 lines.append("    Hazards:")
                 for hazard in hazards:
                     lines.append(f"      {_format_hazard_video(hazard, classifications)}")
+
+            active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0]
+            if active_regions:
+                lines.append("    Population Centers:")
+                for r in active_regions:
+                    pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
+                    size = f"{r['size']} — " if r.get("size") else ""
+                    status = _format_region_status(r)
+                    lines.append(f"      {r['name']} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
 
             # EXOSTORM — remove this block if mechanic is retired
             if planet.get("exostorm"):
@@ -541,17 +637,33 @@ def get_theater_data(parsed_data, limits=None):
                 {"name": h["name"], "description": h.get("description", "")}
                 for h in p.get("hazards", []) if h.get("name") and h["name"] != "None"
             ]
+            if p["is_defense"]:
+                d_label, d_time = _format_defense_time(p)
+                time_status = f"{d_label}: {d_time}" if d_label else d_time
+            else:
+                time_status = f"Time to Liberation: {_format_lib_time(p['liberation_time_hours'])}"
+            regions = []
+            for r in p.get("regions", []):
+                pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
+                regions.append({
+                    "name": r["name"],
+                    "size": r.get("size", ""),
+                    "players": r["players"],
+                    "progress_pct": pct,
+                    "is_available": r["is_available"],
+                    "status": _format_region_status(r),
+                })
             planet_refs.append({
                 "name": p["name"],
                 "player_count": f"{p['player_count']:,}",
                 "progress_pct": p["progress_pct"],
-                "liberation_time": format_duration(p["liberation_time_hours"]),
-                "time_label": "Time to defense" if p["is_defense"] else "Time to liberation",
+                "time_status": time_status,
                 "is_defense": p["is_defense"],
                 "is_mo": p["index"] in mo_indices,
                 "biome": p.get("biome", ""),
                 "biome_description": p.get("biome_description", ""),
                 "hazards": hazards,
+                "regions": regions,
             })
 
         mo_ref = None

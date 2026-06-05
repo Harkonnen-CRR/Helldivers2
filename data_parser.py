@@ -10,10 +10,10 @@ _TASK_TYPE_MAP = {
 }
 
 _STATUS_LABEL_MAP = {
-    3: "cooldown",
-    1: "funding",
     0: "inactive",
-    2: "unknown_2",
+    1: "funding",
+    2: "active",
+    3: "cooldown",
 }
 
 
@@ -28,14 +28,7 @@ def _load(filename):
         raise ValueError(f"Malformed JSON in {path}: {e}")
 
 
-def _liberation_time(health, player_count, regen_per_second, impact_multiplier):
-    net = impact_multiplier * player_count - regen_per_second
-    if net <= 0:
-        return None
-    return (health / net) / 3600
-
-
-def _build_planet(planet, campaigns_by_index, impact_multiplier, exostorm):  # EXOSTORM — remove this block if mechanic is retired
+def _build_planet(planet, campaigns_by_index, exostorm):  # EXOSTORM — remove this block if mechanic is retired
     stats = planet["statistics"]
     player_count = stats["playerCount"]
     health = planet["health"]
@@ -62,7 +55,25 @@ def _build_planet(planet, campaigns_by_index, impact_multiplier, exostorm):  # E
     contest_max_health = raw_event["maxHealth"] if is_defense else max_health
 
     progress_pct = round((1 - contest_health / contest_max_health) * 100, 2) if contest_max_health else None
-    lib_time = None if is_defense else _liberation_time(contest_health, player_count, planet["regenPerSecond"], impact_multiplier)  # Defense planets require two fetches to calculate net rate — handled at dashboard layer
+
+    regions = []
+    for r in planet.get("regions", []):
+        desc = r.get("description", "")
+        if desc == "null":
+            desc = ""
+        regions.append({
+            "id": r["id"],
+            "name": r["name"],
+            "size": r.get("size", ""),
+            "description": desc,
+            "health": r["health"],
+            "max_health": r["maxHealth"],
+            "regen_per_second": r.get("regenPerSecond", 0),
+            "availability_factor": r.get("availabilityFactor", 0),
+            "is_available": r.get("isAvailable", False),
+            "players": r.get("players", 0),
+            "liberation_time_hours": None,
+        })
 
     return {
         "index": planet["index"],
@@ -73,10 +84,12 @@ def _build_planet(planet, campaigns_by_index, impact_multiplier, exostorm):  # E
         "biome": planet["biome"]["name"],
         "biome_description": planet["biome"].get("description", ""),
         "hazards": [{"name": h["name"], "description": h["description"]} for h in planet.get("hazards", [])],
+        "regions": regions,
         "progress_pct": progress_pct,
         "is_defense": is_defense,
+        "contest_health": contest_health,
         "regen_per_second": planet["regenPerSecond"],
-        "liberation_time_hours": lib_time,
+        "liberation_time_hours": None,
         "campaign_level": campaign["count"] if campaign else None,
         "campaign_type": campaign["type"] if campaign else None,
         "event": event,
@@ -127,6 +140,7 @@ def _build_dss(dss_data):
             "status_expire": ta.get("statusExpire"),
             "funding_progress": [
                 {
+                    "item_mix_id": c.get("itemMixId"),
                     "current": c["currentValue"],
                     "target": c["targetValue"],
                     "delta_per_second": c["deltaPerSecond"],
@@ -154,7 +168,7 @@ def parse_all(exostorm=None):  # EXOSTORM — remove this block if mechanic is r
     campaigns_by_index = {c["planet"]["index"]: c for c in campaigns_data}
 
     top_planets = sorted(planets_data, key=lambda p: p["statistics"]["playerCount"], reverse=True)[:5]
-    planets = [_build_planet(p, campaigns_by_index, impact_multiplier, exostorm) for p in top_planets]  # EXOSTORM — remove this block if mechanic is retired
+    planets = [_build_planet(p, campaigns_by_index, exostorm) for p in top_planets]  # EXOSTORM — remove this block if mechanic is retired
 
     return {
         "planets": planets,

@@ -14,7 +14,7 @@ CLASSIFICATIONS_PATH = "data/classifications.json"
 FLAVOR_PATH = "data/flavor.json"
 
 state = {
-    "snapshot1_defense": {},
+    "snapshot1_health": {},
     "snapshot1_time": None,
     "classifications": {},
     "flavor": {},
@@ -97,12 +97,17 @@ def refresh():
     with open("data/planets.json") as f:
         raw_planets = json.load(f)
 
-    snapshot1_defense = {}
+    snapshot1_health = {}
     for p in raw_planets:
+        idx = p["index"]
         event = p.get("event")
         if event and event.get("eventType") == 1:
-            snapshot1_defense[p["index"]] = event["health"]
-    state["snapshot1_defense"] = snapshot1_defense
+            snapshot1_health[idx] = event["health"]
+        else:
+            snapshot1_health[idx] = p["health"]
+        for r in p.get("regions", []):
+            snapshot1_health[f"{idx}_r{r['id']}"] = r["health"]
+    state["snapshot1_health"] = snapshot1_health
 
     parsed = parse_all()
     items = _get_classification_items(raw_planets)
@@ -143,14 +148,19 @@ def fetch2():
     elapsed = (snapshot2_time - state["snapshot1_time"]).total_seconds()
     if elapsed > 0:
         for planet in parsed["planets"]:
-            if not planet["is_defense"] or not planet.get("event"):
-                continue
             idx = planet["index"]
-            health1 = state["snapshot1_defense"].get(idx)
-            health2 = planet["event"]["health"]
-            if health1 is not None and health2 is not None and health1 > health2:
+            health1 = state["snapshot1_health"].get(idx)
+            health2 = planet["contest_health"]
+            if health1 is not None and health1 > health2 > 0:
                 net_rate = (health1 - health2) / elapsed
-                planet["liberation_time_hours"] = (health2 / net_rate) / 3600
+                planet["liberation_time_hours"] = health2 / net_rate / 3600
+            for region in planet.get("regions", []):
+                rkey = f"{idx}_r{region['id']}"
+                r_h1 = state["snapshot1_health"].get(rkey)
+                r_h2 = region["health"]
+                if r_h1 is not None and r_h1 > r_h2 > 0:
+                    net_rate = (r_h1 - r_h2) / elapsed
+                    region["liberation_time_hours"] = r_h2 / net_rate / 3600
 
     state["last_parsed"] = parsed
     theaters = get_theater_data(parsed, state["flavor"].get("limits", {}))

@@ -688,13 +688,20 @@
         `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — ' + escHtml(h.description) : ''}</div>`
       ).join('');
       const savedNote = (planetNotes && planetNotes[p.name]) ? planetNotes[p.name] : '';
+      const regionLines = (p.regions && p.regions.length) ? p.regions.map(r => {
+        const avail = r.is_available ? '✓' : '✗';
+        const playerStr = r.players > 0 ? ` | ${r.players} Helldivers` : '';
+        const sizeStr = r.size ? ` [${escHtml(r.size)}]` : '';
+        return `<div class="ref-planet-stat" style="padding-left:8px;color:${r.is_available ? '#aaa' : '#555'}">${avail} ${escHtml(r.name)}${sizeStr} — ${r.progress_pct}% cleared${playerStr} | ${escHtml(r.status)}</div>`;
+      }).join('') : '';
       html += `
         <div class="ref-planet">
           <div class="ref-planet-name${moTag}">${escHtml(p.name)}${p.is_mo ? ' ★' : ''}</div>
-          <div class="ref-planet-stat">Players: ${p.player_count} | ${p.is_defense ? 'Defense' : 'Liberation'}: ${p.progress_pct}% | ${p.time_label}: ${p.liberation_time}</div>
+          <div class="ref-planet-stat">Players: ${p.player_count} | ${p.is_defense ? 'Defense' : 'Liberation'}: ${p.progress_pct}% | ${p.time_status}</div>
           ${p.biome ? `<div class="ref-planet-stat">Biome: ${escHtml(p.biome)}</div>` : ''}
           ${p.biome_description ? `<div class="ref-planet-hazards" style="font-style:italic;color:#666">${escHtml(p.biome_description)}</div>` : ''}
           ${hazardLines}
+          ${regionLines ? `<div class="planet-notes-label">Population Centers</div>${regionLines}` : ''}
           <div class="planet-notes-label">Notes</div>
           <textarea class="planet-notes-input" data-scope="planet_notes" data-key="${escHtml(p.name)}">${escHtml(savedNote)}</textarea>
         </div>`;
@@ -750,12 +757,20 @@
     });
   }
 
+  let _reformatTimer = null;
+
   async function saveFlavor(scope, key, value) {
     await fetch('/save_flavor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scope, key, value }),
     });
+    clearTimeout(_reformatTimer);
+    _reformatTimer = setTimeout(() => {
+      if (document.getElementById('reformat-btn').style.display !== 'none') {
+        reformat();
+      }
+    }, 1000);
   }
 
   // ── Search ────────────────────────────────────────────────────
