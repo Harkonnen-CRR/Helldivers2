@@ -23,6 +23,25 @@ _CAMPAIGN_TYPE_MAP = {
     4: "Defense",
 }
 
+_TIER_DISCORD = {
+    "large": ("**", "**"),
+    "small": ("__", "__"),
+    "none":  ("",   ""  ),
+}
+
+_TIER_VIDEO_TRANSFORM = {
+    "large": str.upper,
+    "small": str.title,
+    "none":  str.title,
+}
+
+_DSS_STATUS_TIER = {
+    "active":   "large",
+    "funding":  "small",
+    "cooldown": "none",
+    "inactive": "none",
+}
+
 
 def _load_planet_index_to_name():
     with open(os.path.join("data", "planets.json")) as f:
@@ -126,11 +145,17 @@ def classify_items(parsed_data):
         print(f"\n{item['label']}")
         print(f"  {item['description']}")
         while True:
-            answer = input("Bold (gameplay effect)? y/n: ").strip().lower()
-            if answer in ("y", "n"):
-                classifications[key] = answer == "y"
+            answer = input("Effect level? (l)arge / (s)mall / (n)one: ").strip().lower()
+            if answer in ("l", "large"):
+                classifications[key] = "large"
                 break
-            print("Please enter y or n.")
+            if answer in ("s", "small"):
+                classifications[key] = "small"
+                break
+            if answer in ("n", "none"):
+                classifications[key] = "none"
+                break
+            print("Please enter l, s, or n.")
 
     return classifications
 
@@ -207,24 +232,19 @@ def _build_theaters(parsed_data):
 
 def _format_hazard_discord(hazard, classifications):
     key = f"hazard_{hazard['name']}"
-    is_gameplay = classifications.get(key, False)
-    name = hazard["name"]
-    desc = hazard["description"]
-    if is_gameplay:
-        return f"**{name}** — *{desc}*"
-    return f"{name} — *{desc}*"
+    tier = classifications.get(key, "none")
+    prefix, suffix = _TIER_DISCORD.get(tier, ("", ""))
+    return f"{prefix}{hazard['name']}{suffix} — *{hazard['description']}*"
 
 
 def _format_hazard_video(hazard, classifications):
     key = f"hazard_{hazard['name']}"
-    is_gameplay = classifications.get(key, False)
-    desc = hazard["description"]
-    if is_gameplay:
-        return f"{hazard['name'].upper()} — {desc}"
-    return f"{hazard['name'].title()} — {desc}"
+    tier = classifications.get(key, "none")
+    transform = _TIER_VIDEO_TRANSFORM.get(tier, str.title)
+    return f"{transform(hazard['name'])} — {hazard['description']}"
 
 
-def _format_dss_discord(dss, classifications):
+def _format_dss_discord(dss):
     """Returns a list of Discord-formatted lines for the DSS section."""
     lines = []
     lines.append("**DEMOCRATIC SPACE STATION**")
@@ -234,10 +254,10 @@ def _format_dss_discord(dss, classifications):
         lines.append(f"> **Next FTL Jump:** {format_duration(remaining)}")
     lines.append("> **Tactical Actions:**")
     for action in dss["tactical_actions"]:
-        key = f"dss_{action['name']}"
-        is_gameplay = classifications.get(key, False)
+        tier = _DSS_STATUS_TIER.get(action["status_label"], "none")
+        prefix, suffix = _TIER_DISCORD.get(tier, ("", ""))
         desc = _strip_html(action["strategic_description"])
-        desc_fmt = f"**{desc}**" if is_gameplay else f"*{desc}*"
+        desc_fmt = f"{prefix}{desc}{suffix}" if prefix else f"*{desc}*"
         status = action["status_label"]
         expire_str = ""
         if status == "cooldown" and action.get("status_expire"):
@@ -253,7 +273,7 @@ def _format_dss_discord(dss, classifications):
     return lines
 
 
-def _format_dss_video(dss, classifications):
+def _format_dss_video(dss):
     """Returns a list of plain-text lines for the DSS section."""
     lines = []
     lines.append("    DEMOCRATIC SPACE STATION")
@@ -263,8 +283,8 @@ def _format_dss_video(dss, classifications):
         lines.append(f"    Next FTL Jump: {format_duration(remaining)}")
     lines.append("    Tactical Actions:")
     for action in dss["tactical_actions"]:
-        key = f"dss_{action['name']}"
-        is_gameplay = classifications.get(key, False)
+        tier = _DSS_STATUS_TIER.get(action["status_label"], "none")
+        transform = _TIER_VIDEO_TRANSFORM.get(tier, str.title)
         desc = _strip_html(action["strategic_description"])
         status = action["status_label"]
         status_fmt = status.upper() if status in ("active", "cooldown") else status
@@ -272,8 +292,7 @@ def _format_dss_video(dss, classifications):
         if status == "cooldown" and action.get("status_expire"):
             remaining = _time_remaining_hours(action["status_expire"])
             expire_str = f" | Time remaining: {format_duration(remaining)}"
-        name_fmt = action["name"].upper() if is_gameplay else action["name"]
-        lines.append(f"      {name_fmt} — {status_fmt}{expire_str}")
+        lines.append(f"      {transform(action['name'])} — {status_fmt}{expire_str}")
         lines.append(f"        {desc}")
         for fp in action.get("funding_progress", []):
             lines.append(
@@ -351,7 +370,7 @@ def format_discord(parsed_data, classifications):
 
     if dss:
         lines.append("")
-        lines.extend(_format_dss_discord(dss, classifications))
+        lines.extend(_format_dss_discord(dss))
 
     text = "\n".join(lines)
     used = len(text)
@@ -442,7 +461,7 @@ def format_video(parsed_data, classifications):
 
     if dss:
         lines.append(MAJOR_SEP)
-        lines.extend(_format_dss_video(dss, classifications))
+        lines.extend(_format_dss_video(dss))
 
     return "\n".join(lines)
 

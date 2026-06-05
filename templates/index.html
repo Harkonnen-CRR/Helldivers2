@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SEAF Daily Briefing</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 24px;
+    }
+
+    h1 { color: #f0c040; font-size: 20px; letter-spacing: 2px; margin-bottom: 4px; }
+    h2 { color: #a0b8d0; font-size: 13px; letter-spacing: 1px; margin-bottom: 12px; }
+    h3 { color: #a0b8d0; font-size: 12px; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
+
+    .section {
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background: #1a3a1a;
+      color: #80d080;
+      border: 1px solid #3a6a3a;
+      border-radius: 3px;
+      padding: 8px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    button:hover { background: #224422; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    button.cancel {
+      background: #3a1a1a;
+      color: #d08080;
+      border-color: #6a3a3a;
+    }
+    button.cancel:hover { background: #4a2020; }
+
+    button.copy-btn {
+      background: #1a1a3a;
+      color: #8080d0;
+      border-color: #3a3a6a;
+      padding: 5px 14px;
+      font-size: 12px;
+    }
+    button.copy-btn:hover { background: #222244; }
+
+    /* Classification panel */
+    .classification-panel { }
+
+    .hazard-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid #222;
+    }
+    .hazard-item:last-child { border-bottom: none; }
+    .hazard-item.is-new { background: #1a1a00; padding: 8px; border-radius: 3px; border: 1px solid #4a4a00; margin-bottom: 4px; }
+    .hazard-item.is-new::before { content: "NEW "; color: #f0c040; font-size: 11px; }
+
+    .hazard-name { color: #e0e0e0; min-width: 160px; font-weight: bold; }
+    .hazard-desc { color: #888; font-size: 12px; flex: 1; }
+
+    .tier-radios { display: flex; gap: 10px; align-items: center; }
+    .tier-radios label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+    .tier-radios input[type=radio] { accent-color: #f0c040; cursor: pointer; }
+
+    label.tier-large { color: #f0c040; font-weight: bold; }
+    label.tier-small { color: #a0c0e0; text-decoration: underline; }
+    label.tier-none  { color: #666; }
+
+    .no-hazards { color: #555; font-style: italic; }
+
+    /* Progress bar */
+    #progress-section { display: none; }
+
+    .progress-label {
+      color: #f0c040;
+      font-size: 12px;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar-track {
+      background: #222;
+      border: 1px solid #3a3a00;
+      border-radius: 2px;
+      height: 18px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    #progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3a5a00, #f0c040);
+      transition: width 1s linear;
+    }
+
+    .progress-time { color: #888; font-size: 12px; }
+
+    /* Output panels */
+    .outputs-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .output-panel h3 { margin-bottom: 8px; }
+
+    .output-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .search-input {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 4px 8px;
+      width: 180px;
+    }
+    .search-input:focus { outline: none; border-color: #555; }
+
+    .search-count { color: #666; font-size: 12px; min-width: 60px; }
+
+    textarea {
+      width: 100%;
+      height: 480px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 10px;
+      resize: vertical;
+    }
+    textarea:focus { outline: none; border-color: #444; }
+
+    .char-count { color: #555; font-size: 11px; margin-top: 4px; text-align: right; }
+
+    #status-msg { color: #d08080; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+  <div class="header-row">
+    <div>
+      <h1>SEAF DAILY BRIEFING</h1>
+      <h2>Hark the Helldiver — War Update Dashboard</h2>
+    </div>
+    <button id="refresh-btn" onclick="startRefresh()">⟳ REFRESH</button>
+    <button id="cancel-btn" class="cancel" onclick="cancelRefresh()" style="display:none">✕ CANCEL</button>
+    <span id="status-msg"></span>
+  </div>
+
+  <!-- Classification panel -->
+  <div class="section classification-panel">
+    <h3>Hazard Classifications</h3>
+    <div id="hazard-list">
+      {% if classifications %}
+        {% for key, tier in classifications.items() %}
+          {% if key.startswith('hazard_') %}
+            {% set name = key[7:] %}
+            <div class="hazard-item" data-key="{{ key }}">
+              <div class="hazard-name">{{ name }}</div>
+              <div class="tier-radios">
+                <label class="tier-large"><input type="radio" name="{{ key }}" value="large" {% if tier == 'large' %}checked{% endif %} onchange="saveTier('{{ key }}', 'large')"> Large</label>
+                <label class="tier-small"><input type="radio" name="{{ key }}" value="small" {% if tier == 'small' %}checked{% endif %} onchange="saveTier('{{ key }}', 'small')"> Small</label>
+                <label class="tier-none"> <input type="radio" name="{{ key }}" value="none"  {% if tier == 'none'  %}checked{% endif %} onchange="saveTier('{{ key }}', 'none')">  None</label>
+              </div>
+              <div class="hazard-desc"></div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <div class="no-hazards">No hazards classified yet — hit Refresh to load current data.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Progress bar (hidden until refresh) -->
+  <div class="section" id="progress-section">
+    <div class="progress-label">⚙ LIBERATION RATE CALCULATION IN PROGRESS</div>
+    <div class="progress-bar-track">
+      <div id="progress-fill"></div>
+    </div>
+    <div class="progress-time" id="progress-time">60s remaining</div>
+  </div>
+
+  <!-- Outputs -->
+  <div class="outputs-row">
+    <div class="section output-panel">
+      <h3>Discord Post</h3>
+      <div class="output-toolbar">
+        <input class="search-input" id="search-discord" type="text" placeholder="Search..." oninput="searchIn('discord')">
+        <span class="search-count" id="count-discord"></span>
+        <button class="copy-btn" onclick="copyOutput('discord')">Copy</button>
+      </div>
+      <textarea id="out-discord" spellcheck="false">{% if outputs %}{{ outputs.discord }}{% endif %}</textarea>
+      <div class="char-count" id="chars-discord"></div>
+    </div>
+
+    <div class="section output-panel">
+      <h3>Video Script</h3>
+      <div class="output-toolbar">
+        <input class="search-input" id="search-video" type="text" placeholder="Search..." oninput="searchIn('video')">
+        <span class="search-count" id="count-video"></span>
+        <button class="copy-btn" onclick="copyOutput('video')">Copy</button>
+      </div>
+      <textarea id="out-video" spellcheck="false">{% if outputs %}{{ outputs.video }}{% endif %}</textarea>
+      <div class="char-count" id="chars-video"></div>
+    </div>
+  </div>
+
+<script>
+  const COUNTDOWN = 60;
+  let countdownTimer = null;
+  let countdownInterval = null;
+
+  // ── Refresh flow ──────────────────────────────────────────────
+
+  async function startRefresh() {
+    setStatus('Fetching data...');
+    setRefreshBusy(true);
+
+    let res, data;
+    try {
+      res = await fetch('/refresh', { method: 'POST' });
+      data = await res.json();
+    } catch (e) {
+      setStatus('Network error: ' + e.message);
+      setRefreshBusy(false);
+      return;
+    }
+
+    if (data.status !== 'ok') {
+      setStatus('Error: ' + data.message);
+      setRefreshBusy(false);
+      return;
+    }
+
+    updateClassificationPanel(data.items);
+    startCountdown();
+  }
+
+  function startCountdown() {
+    setStatus('');
+    document.getElementById('progress-section').style.display = 'block';
+    let remaining = COUNTDOWN;
+    updateCountdownDisplay(remaining);
+
+    countdownInterval = setInterval(() => {
+      remaining -= 1;
+      updateCountdownDisplay(remaining);
+      if (remaining <= 0) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        runFetch2();
+      }
+    }, 1000);
+  }
+
+  function updateCountdownDisplay(remaining) {
+    const pct = ((COUNTDOWN - remaining) / COUNTDOWN) * 100;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-time').textContent = remaining + 's remaining';
+  }
+
+  async function runFetch2() {
+    setStatus('Calculating liberation rates...');
+
+    let res, data;
+    try {
+      res = await fetch('/fetch2', { method: 'POST' });
+      data = await res.json();
+    } catch (e) {
+      setStatus('Network error: ' + e.message);
+      setRefreshBusy(false);
+      return;
+    }
+
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('progress-fill').style.width = '0%';
+    setRefreshBusy(false);
+
+    if (data.status !== 'ok') {
+      setStatus('Error: ' + data.message);
+      return;
+    }
+
+    setStatus('');
+    document.getElementById('out-discord').value = data.discord;
+    document.getElementById('out-video').value = data.video;
+    updateCharCount('discord');
+    updateCharCount('video');
+  }
+
+  function cancelRefresh() {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('progress-fill').style.width = '0%';
+    setRefreshBusy(false);
+    setStatus('Cancelled.');
+  }
+
+  function setRefreshBusy(busy) {
+    document.getElementById('refresh-btn').disabled = busy;
+    document.getElementById('cancel-btn').style.display = busy ? 'inline-block' : 'none';
+  }
+
+  function setStatus(msg) {
+    document.getElementById('status-msg').textContent = msg;
+  }
+
+  // ── Classification panel ──────────────────────────────────────
+
+  function updateClassificationPanel(items) {
+    const list = document.getElementById('hazard-list');
+    list.innerHTML = '';
+
+    if (!items || Object.keys(items).length === 0) {
+      list.innerHTML = '<div class="no-hazards">No hazards found in current data.</div>';
+      return;
+    }
+
+    for (const [key, item] of Object.entries(items)) {
+      const div = document.createElement('div');
+      div.className = 'hazard-item' + (item.is_new ? ' is-new' : '');
+      div.dataset.key = key;
+      div.innerHTML = `
+        <div class="hazard-name">${escHtml(item.label)}</div>
+        <div class="tier-radios">
+          <label class="tier-large"><input type="radio" name="${key}" value="large" ${item.tier === 'large' ? 'checked' : ''} onchange="saveTier('${key}', 'large')"> Large</label>
+          <label class="tier-small"><input type="radio" name="${key}" value="small" ${item.tier === 'small' ? 'checked' : ''} onchange="saveTier('${key}', 'small')"> Small</label>
+          <label class="tier-none"> <input type="radio" name="${key}" value="none"  ${item.tier === 'none'  ? 'checked' : ''} onchange="saveTier('${key}', 'none')">  None</label>
+        </div>
+        <div class="hazard-desc">${escHtml(item.description)}</div>
+      `;
+      list.appendChild(div);
+    }
+  }
+
+  async function saveTier(key, value) {
+    await fetch('/save_classifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    });
+  }
+
+  // ── Search / highlight ────────────────────────────────────────
+
+  function searchIn(which) {
+    const query = document.getElementById('search-' + which).value.trim().toLowerCase();
+    const textarea = document.getElementById('out-' + which);
+    const countEl = document.getElementById('count-' + which);
+
+    if (!query) {
+      countEl.textContent = '';
+      return;
+    }
+
+    const text = textarea.value.toLowerCase();
+    let count = 0;
+    let pos = 0;
+    while ((pos = text.indexOf(query, pos)) !== -1) {
+      count++;
+      pos += query.length;
+    }
+
+    countEl.textContent = count > 0 ? count + ' found' : 'not found';
+
+    if (count > 0) {
+      const firstPos = text.indexOf(query);
+      textarea.focus();
+      textarea.setSelectionRange(firstPos, firstPos + query.length);
+    }
+  }
+
+  // ── Copy ──────────────────────────────────────────────────────
+
+  async function copyOutput(which) {
+    const text = document.getElementById('out-' + which).value;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // Fallback for browsers that block clipboard API
+      const ta = document.getElementById('out-' + which);
+      ta.select();
+      document.execCommand('copy');
+    }
+  }
+
+  // ── Char counter ──────────────────────────────────────────────
+
+  function updateCharCount(which) {
+    const ta = document.getElementById('out-' + which);
+    const len = ta.value.length;
+    const el = document.getElementById('chars-' + which);
+    if (which === 'discord') {
+      el.textContent = len + ' / 4000 characters';
+    }
+  }
+
+  document.getElementById('out-discord').addEventListener('input', () => updateCharCount('discord'));
+
+  // Init char counts if outputs were pre-loaded from server
+  updateCharCount('discord');
+
+  // ── Utility ───────────────────────────────────────────────────
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+
+</body>
+</html>
