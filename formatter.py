@@ -301,9 +301,9 @@ def format_discord(parsed_data, classifications):
         planet_index_to_name = _load_planet_index_to_name()
         reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], f"Unknown (type {mo['reward_type']})")
         lines.append("**MAJOR ORDER**")
-        lines.append(f"> **{mo['title']}**")
         lines.append(f"> {mo['briefing']}")
-        lines.append(f"> {mo['description']}")
+        if mo.get('description'):
+            lines.append(f"> {mo['description']}")
         lines.append(f"> **Reward:** {mo['reward_amount']} {reward_label}")
         lines.append(f"> **Expires in:** {format_duration(_time_remaining_hours(mo['expiration']))}")
         lines.append("> **Tasks:**")
@@ -333,7 +333,7 @@ def format_discord(parsed_data, classifications):
             lines.append(f"> **Players:** {planet['player_count']:,}")
             lines.append(f"> **{progress_label}:** {planet['progress_pct']}%")
             lines.append(f"> **{time_label}:** {format_duration(planet['liberation_time_hours'])}")
-            lines.append(f"> **Regen/sec:** {planet['regen_per_second']}")
+            lines.append(f"> **Regen/sec:** {planet['regen_per_second']:.2f}")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
             if hazards:
@@ -387,8 +387,9 @@ def format_video(parsed_data, classifications):
         reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], f"Unknown (type {mo['reward_type']})")
         lines.append("MAJOR ORDER")
         lines.append(MINOR_SEP)
-        lines.append(f"    Title: {mo['title']}")
-        lines.append(f"    Briefing: {mo['briefing']}")
+        lines.append(f"    {mo['briefing']}")
+        if mo.get('description'):
+            lines.append(f"    {mo['description']}")
         lines.append(f"    Reward: {mo['reward_amount']} {reward_label}")
         lines.append(f"    Expires in: {format_duration(_time_remaining_hours(mo['expiration']))}")
         lines.append("    Tasks:")
@@ -423,7 +424,7 @@ def format_video(parsed_data, classifications):
             lines.append(f"    Players: {planet['player_count']:,}")
             lines.append(f"    {progress_label}: {planet['progress_pct']}%")
             lines.append(f"    {time_label}: {format_duration(planet['liberation_time_hours'])}")
-            lines.append(f"    Regen/sec: {planet['regen_per_second']}")
+            lines.append(f"    Regen/sec: {planet['regen_per_second']:.2f}")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
             if hazards:
