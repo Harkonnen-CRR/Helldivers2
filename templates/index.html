@@ -31,6 +31,7 @@
       align-items: center;
       gap: 16px;
       margin-bottom: 20px;
+      flex-wrap: wrap;
     }
 
     button {
@@ -54,6 +55,13 @@
     }
     button.cancel:hover { background: #4a2020; }
 
+    button.secondary {
+      background: #1a1a3a;
+      color: #8080d0;
+      border-color: #3a3a6a;
+    }
+    button.secondary:hover { background: #222244; }
+
     button.copy-btn {
       background: #1a1a3a;
       color: #8080d0;
@@ -63,9 +71,25 @@
     }
     button.copy-btn:hover { background: #222244; }
 
-    /* Classification panel */
-    .classification-panel { }
+    button.help-btn {
+      background: #2a2a00;
+      color: #a0a040;
+      border-color: #4a4a00;
+      padding: 5px 10px;
+      font-size: 11px;
+    }
+    button.help-btn:hover { background: #3a3a00; }
 
+    button.nav-btn {
+      background: #222;
+      color: #888;
+      border-color: #444;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+    button.nav-btn:hover { background: #333; }
+
+    /* Classification panel */
     .hazard-item {
       display: flex;
       align-items: flex-start;
@@ -75,7 +99,7 @@
     }
     .hazard-item:last-child { border-bottom: none; }
     .hazard-item.is-new { background: #1a1a00; padding: 8px; border-radius: 3px; border: 1px solid #4a4a00; margin-bottom: 4px; }
-    .hazard-item.is-new::before { content: "NEW "; color: #f0c040; font-size: 11px; }
+    .hazard-item.is-new .hazard-name::before { content: "NEW  "; color: #f0c040; font-size: 11px; }
 
     .hazard-name { color: #e0e0e0; min-width: 160px; font-weight: bold; }
     .hazard-desc { color: #888; font-size: 12px; flex: 1; }
@@ -83,7 +107,6 @@
     .tier-radios { display: flex; gap: 10px; align-items: center; }
     .tier-radios label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
     .tier-radios input[type=radio] { accent-color: #f0c040; cursor: pointer; }
-
     label.tier-large { color: #f0c040; font-weight: bold; }
     label.tier-small { color: #a0c0e0; text-decoration: underline; }
     label.tier-none  { color: #666; }
@@ -92,46 +115,151 @@
 
     /* Progress bar */
     #progress-section { display: none; }
-
-    .progress-label {
-      color: #f0c040;
-      font-size: 12px;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .progress-bar-track {
-      background: #222;
-      border: 1px solid #3a3a00;
-      border-radius: 2px;
-      height: 18px;
-      overflow: hidden;
-      margin-bottom: 8px;
-    }
-
-    #progress-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #3a5a00, #f0c040);
-      transition: width 1s linear;
-    }
-
+    .progress-label { color: #f0c040; font-size: 12px; letter-spacing: 1px; margin-bottom: 8px; }
+    .progress-bar-track { background: #222; border: 1px solid #3a3a00; border-radius: 2px; height: 18px; overflow: hidden; margin-bottom: 8px; }
+    #progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3a5a00, #f0c040); transition: width 1s linear; }
     .progress-time { color: #888; font-size: 12px; }
 
-    /* Output panels */
-    .outputs-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
+    /* Flavor editor */
+    #flavor-section { display: none; }
+
+    .theater-card {
+      border: 1px solid #2a3a2a;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      overflow: hidden;
     }
 
-    .output-panel h3 { margin-bottom: 8px; }
+    .theater-card-header {
+      background: #1a2a1a;
+      padding: 10px 14px;
+      color: #80d080;
+      font-size: 13px;
+      letter-spacing: 2px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .theater-card-header:hover { background: #1e2e1e; }
+    .theater-card-header .toggle-icon { color: #555; font-size: 11px; }
+
+    .theater-card-body { display: none; padding: 14px; }
+    .theater-card-body.open { display: block; }
+
+    .theater-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .flavor-write-panel label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    textarea.flavor-textarea {
+      width: 100%;
+      height: 120px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 8px;
+      resize: vertical;
+    }
+    textarea.flavor-textarea:focus { outline: none; border-color: #444; }
+
+    .ref-panel {
+      background: #0f0f0f;
+      border: 1px solid #222;
+      border-radius: 3px;
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .ref-planet {
+      border-bottom: 1px solid #1e1e1e;
+      padding: 6px 0;
+    }
+    .ref-planet:last-child { border-bottom: none; }
+    .ref-planet-name { color: #e0e0e0; font-weight: bold; }
+    .ref-planet-name.is-mo { color: #f0c040; }
+    .ref-planet-stat { color: #666; font-size: 11px; }
+    .ref-planet-hazards { color: #888; font-size: 11px; font-style: italic; }
+
+    .ref-mo { background: #1a1a00; border: 1px solid #3a3a00; border-radius: 3px; padding: 8px; margin-top: 8px; }
+    .ref-mo-label { color: #f0c040; font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+    .ref-mo-text { color: #c0c080; font-size: 11px; }
+    .ref-mo-task { color: #a0a060; font-size: 11px; }
+
+    .ref-dss { background: #001a2a; border: 1px solid #003a5a; border-radius: 3px; padding: 8px; margin-top: 8px; }
+    .ref-dss-label { color: #60c0f0; font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+    .ref-dss-text { color: #80a0c0; font-size: 11px; }
+    .ref-dss-action { font-size: 11px; }
+    .ref-dss-action.large { color: #f0c040; font-weight: bold; }
+    .ref-dss-action.small { color: #a0c0e0; }
+    .ref-dss-action.none  { color: #555; }
+
+    .planet-notes-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; margin-bottom: 3px; }
+    textarea.planet-notes-input {
+      width: 100%;
+      height: 50px;
+      background: #0a0a0a;
+      border: 1px solid #1e2e1e;
+      border-radius: 2px;
+      color: #80a080;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      padding: 4px 6px;
+      resize: vertical;
+    }
+    textarea.planet-notes-input:focus { outline: none; border-color: #2a4a2a; }
+
+    /* Planet flavor text list */
+    .planet-flavor-section { border-top: 1px solid #222; padding-top: 12px; }
+    .planet-flavor-label { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+    .planet-flavor-item { margin-bottom: 8px; }
+    .planet-flavor-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .planet-flavor-toggle input[type=checkbox] { accent-color: #80d080; cursor: pointer; }
+    .planet-flavor-toggle span { color: #c0c0c0; font-size: 12px; }
+    textarea.planet-flavor-text {
+      display: none;
+      width: 100%;
+      height: 60px;
+      margin-top: 6px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 6px 8px;
+      resize: vertical;
+    }
+    textarea.planet-flavor-text:focus { outline: none; border-color: #444; }
+    textarea.planet-flavor-text.visible { display: block; }
+
+    /* Output panels */
+    .outputs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
     .output-toolbar {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       margin-bottom: 8px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .search-input {
@@ -142,13 +270,12 @@
       font-family: 'Courier New', monospace;
       font-size: 12px;
       padding: 4px 8px;
-      width: 180px;
+      width: 150px;
     }
     .search-input:focus { outline: none; border-color: #555; }
-
     .search-count { color: #666; font-size: 12px; min-width: 60px; }
 
-    textarea {
+    textarea.output-textarea {
       width: 100%;
       height: 480px;
       background: #111;
@@ -161,9 +288,26 @@
       padding: 10px;
       resize: vertical;
     }
-    textarea:focus { outline: none; border-color: #444; }
+    textarea.output-textarea:focus { outline: none; border-color: #444; }
 
     .char-count { color: #555; font-size: 11px; margin-top: 4px; text-align: right; }
+
+    /* Help tooltip */
+    .help-popup {
+      display: none;
+      position: absolute;
+      background: #1a1a00;
+      border: 1px solid #4a4a00;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #c0c080;
+      z-index: 100;
+      width: 260px;
+      line-height: 1.7;
+    }
+    .help-popup.visible { display: block; }
+    .help-popup li { margin-left: 14px; }
 
     #status-msg { color: #d08080; font-size: 12px; }
   </style>
@@ -175,13 +319,14 @@
       <h1>SEAF DAILY BRIEFING</h1>
       <h2>Hark the Helldiver — War Update Dashboard</h2>
     </div>
-    <button id="refresh-btn" onclick="startRefresh()">⟳ REFRESH</button>
+    <button id="refresh-btn" onclick="startRefresh()">⟳ REFRESH DATA</button>
     <button id="cancel-btn" class="cancel" onclick="cancelRefresh()" style="display:none">✕ CANCEL</button>
+    <button id="reformat-btn" class="secondary" onclick="reformat()" style="display:none">↺ REFRESH TEXT</button>
     <span id="status-msg"></span>
   </div>
 
   <!-- Classification panel -->
-  <div class="section classification-panel">
+  <div class="section">
     <h3>Hazard Classifications</h3>
     <div id="hazard-list">
       {% if classifications %}
@@ -205,73 +350,110 @@
     </div>
   </div>
 
-  <!-- Progress bar (hidden until refresh) -->
+  <!-- Progress bar -->
   <div class="section" id="progress-section">
     <div class="progress-label">⚙ LIBERATION RATE CALCULATION IN PROGRESS</div>
-    <div class="progress-bar-track">
-      <div id="progress-fill"></div>
-    </div>
+    <div class="progress-bar-track"><div id="progress-fill"></div></div>
     <div class="progress-time" id="progress-time">60s remaining</div>
+  </div>
+
+  <!-- Flavor editor -->
+  <div class="section" id="flavor-section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <h3 style="margin:0">Flavor Text Editor</h3>
+      <button class="secondary" onclick="reformat()" id="reformat-flavor-btn" style="display:none">↺ REFRESH TEXT</button>
+    </div>
+    <div id="theater-cards"></div>
   </div>
 
   <!-- Outputs -->
   <div class="outputs-row">
-    <div class="section output-panel">
+    <div class="section">
       <h3>Discord Post</h3>
-      <div class="output-toolbar">
+      <div class="output-toolbar" style="position:relative">
         <input class="search-input" id="search-discord" type="text" placeholder="Search..." oninput="searchIn('discord')">
+        <button class="nav-btn" onclick="searchPrev('discord')">◀</button>
+        <button class="nav-btn" onclick="searchNext('discord')">▶</button>
+        <button class="help-btn" onclick="toggleHelp('discord')">?</button>
         <span class="search-count" id="count-discord"></span>
-        <button class="copy-btn" onclick="copyOutput('discord')">Copy</button>
+        <button class="copy-btn" onclick="copyOutput('discord')" style="margin-left:auto">Copy</button>
+        <div class="help-popup" id="help-discord">
+          <ul>
+            <li>Type to search within the output</li>
+            <li>◀ ▶ jumps between matches</li>
+            <li>Counter shows current match (e.g. 2 of 5)</li>
+            <li>Output text is editable directly</li>
+            <li>Use Refresh Text to re-apply flavor text</li>
+          </ul>
+        </div>
       </div>
-      <textarea id="out-discord" spellcheck="false">{% if outputs %}{{ outputs.discord }}{% endif %}</textarea>
+      <textarea class="output-textarea" id="out-discord" spellcheck="false">{% if outputs %}{{ outputs.discord }}{% endif %}</textarea>
       <div class="char-count" id="chars-discord"></div>
     </div>
 
-    <div class="section output-panel">
+    <div class="section">
       <h3>Video Script</h3>
-      <div class="output-toolbar">
+      <div class="output-toolbar" style="position:relative">
         <input class="search-input" id="search-video" type="text" placeholder="Search..." oninput="searchIn('video')">
+        <button class="nav-btn" onclick="searchPrev('video')">◀</button>
+        <button class="nav-btn" onclick="searchNext('video')">▶</button>
+        <button class="help-btn" onclick="toggleHelp('video')">?</button>
         <span class="search-count" id="count-video"></span>
-        <button class="copy-btn" onclick="copyOutput('video')">Copy</button>
+        <button class="copy-btn" onclick="copyOutput('video')" style="margin-left:auto">Copy</button>
+        <div class="help-popup" id="help-video">
+          <ul>
+            <li>Type to search within the output</li>
+            <li>◀ ▶ jumps between matches</li>
+            <li>Counter shows current match (e.g. 2 of 5)</li>
+            <li>Output text is editable directly</li>
+            <li>Use Refresh Text to re-apply flavor text</li>
+          </ul>
+        </div>
       </div>
-      <textarea id="out-video" spellcheck="false">{% if outputs %}{{ outputs.video }}{% endif %}</textarea>
-      <div class="char-count" id="chars-video"></div>
+      <textarea class="output-textarea" id="out-video" spellcheck="false">{% if outputs %}{{ outputs.video }}{% endif %}</textarea>
     </div>
   </div>
 
 <script>
   const COUNTDOWN = 60;
-  let countdownTimer = null;
   let countdownInterval = null;
+
+  // Search state per output panel
+  const searchState = {
+    discord: { matches: [], index: -1 },
+    video:   { matches: [], index: -1 },
+  };
 
   // ── Refresh flow ──────────────────────────────────────────────
 
   async function startRefresh() {
     setStatus('Fetching data...');
-    setRefreshBusy(true);
+    document.getElementById('refresh-btn').disabled = true;
 
     let res, data;
     try {
       res = await fetch('/refresh', { method: 'POST' });
       data = await res.json();
     } catch (e) {
-      setStatus('Network error: ' + e.message);
-      setRefreshBusy(false);
+      setStatus('Network error — click Refresh to retry.');
+      document.getElementById('refresh-btn').disabled = false;
       return;
     }
 
     if (data.status !== 'ok') {
-      setStatus('Error: ' + data.message);
-      setRefreshBusy(false);
+      setStatus('Error: ' + data.message + ' — click Refresh to retry.');
+      document.getElementById('refresh-btn').disabled = false;
       return;
     }
 
     updateClassificationPanel(data.items);
+    buildFlavorEditor(data.theaters, data.flavor);
     startCountdown();
   }
 
   function startCountdown() {
     setStatus('');
+    document.getElementById('cancel-btn').style.display = 'inline-block';
     document.getElementById('progress-section').style.display = 'block';
     let remaining = COUNTDOWN;
     updateCountdownDisplay(remaining);
@@ -295,20 +477,17 @@
 
   async function runFetch2() {
     setStatus('Calculating liberation rates...');
-
     let res, data;
     try {
       res = await fetch('/fetch2', { method: 'POST' });
       data = await res.json();
     } catch (e) {
       setStatus('Network error: ' + e.message);
-      setRefreshBusy(false);
+      resetAfterFetch();
       return;
     }
 
-    document.getElementById('progress-section').style.display = 'none';
-    document.getElementById('progress-fill').style.width = '0%';
-    setRefreshBusy(false);
+    resetAfterFetch();
 
     if (data.status !== 'ok') {
       setStatus('Error: ' + data.message);
@@ -318,8 +497,10 @@
     setStatus('');
     document.getElementById('out-discord').value = data.discord;
     document.getElementById('out-video').value = data.video;
-    updateCharCount('discord');
-    updateCharCount('video');
+    updateCharCount();
+    document.getElementById('reformat-btn').style.display = 'inline-block';
+    document.getElementById('reformat-flavor-btn').style.display = 'inline-block';
+    buildFlavorEditor(data.theaters, data.flavor);
   }
 
   function cancelRefresh() {
@@ -329,17 +510,42 @@
     }
     document.getElementById('progress-section').style.display = 'none';
     document.getElementById('progress-fill').style.width = '0%';
-    setRefreshBusy(false);
+    document.getElementById('cancel-btn').style.display = 'none';
+    document.getElementById('refresh-btn').disabled = false;
     setStatus('Cancelled.');
   }
 
-  function setRefreshBusy(busy) {
-    document.getElementById('refresh-btn').disabled = busy;
-    document.getElementById('cancel-btn').style.display = busy ? 'inline-block' : 'none';
+  function resetAfterFetch() {
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('cancel-btn').style.display = 'none';
+    document.getElementById('refresh-btn').disabled = false;
   }
 
   function setStatus(msg) {
     document.getElementById('status-msg').textContent = msg;
+  }
+
+  // ── Reformat ──────────────────────────────────────────────────
+
+  async function reformat() {
+    setStatus('Reformatting...');
+    let res, data;
+    try {
+      res = await fetch('/reformat', { method: 'POST' });
+      data = await res.json();
+    } catch (e) {
+      setStatus('Network error: ' + e.message);
+      return;
+    }
+    if (data.status !== 'ok') {
+      setStatus('Error: ' + data.message);
+      return;
+    }
+    setStatus('');
+    document.getElementById('out-discord').value = data.discord;
+    document.getElementById('out-video').value = data.video;
+    updateCharCount();
   }
 
   // ── Classification panel ──────────────────────────────────────
@@ -378,34 +584,252 @@
     });
   }
 
-  // ── Search / highlight ────────────────────────────────────────
+  // ── Flavor editor ─────────────────────────────────────────────
+
+  function buildFlavorEditor(theaters, flavor) {
+    if (!theaters || theaters.length === 0) return;
+
+    const section = document.getElementById('flavor-section');
+    const container = document.getElementById('theater-cards');
+    container.innerHTML = '';
+    section.style.display = 'block';
+
+    const theaterFlavors = (flavor && flavor.theaters) ? flavor.theaters : {};
+    const planetFlavors  = (flavor && flavor.planets)  ? flavor.planets  : {};
+
+    for (const theater of theaters) {
+      const faction = theater.faction;
+      const card = document.createElement('div');
+      card.className = 'theater-card';
+
+      // Header (clickable to collapse)
+      const isLimited = flavor && flavor.limits && flavor.limits[faction];
+      const header = document.createElement('div');
+      header.className = 'theater-card-header';
+      header.innerHTML = `
+        <span>${faction.toUpperCase()} FRONT</span>
+        <span style="display:flex;align-items:center;gap:12px">
+          <label onclick="event.stopPropagation()" style="font-size:11px;color:#888;font-weight:normal;cursor:pointer">
+            <input type="checkbox" ${isLimited ? 'checked' : ''} onchange="saveLimit('${escHtml(faction)}', this.checked)" style="accent-color:#f0c040;cursor:pointer">
+            Limit to 1 planet
+          </label>
+          <span class="toggle-icon">▲</span>
+        </span>`;
+      header.onclick = () => {
+        body.classList.toggle('open');
+        header.querySelector('.toggle-icon').textContent = body.classList.contains('open') ? '▲' : '▼';
+      };
+
+      // Body
+      const body = document.createElement('div');
+      body.className = 'theater-card-body open';
+
+      // Two-panel row
+      const panels = document.createElement('div');
+      panels.className = 'theater-panels';
+
+      // Left: write panel
+      const writePanel = document.createElement('div');
+      writePanel.className = 'flavor-write-panel';
+      const savedTheater = theaterFlavors[faction] || '';
+      writePanel.innerHTML = `
+        <label>Theater flavor text</label>
+        <textarea class="flavor-textarea" data-scope="theaters" data-key="${escHtml(faction)}">${escHtml(savedTheater)}</textarea>
+      `;
+
+      // Right: reference panel
+      const refPanel = document.createElement('div');
+      refPanel.className = 'ref-panel';
+      refPanel.innerHTML = buildRefPanelHTML(theater, flavor && flavor.planet_notes);
+
+      panels.appendChild(writePanel);
+      panels.appendChild(refPanel);
+      body.appendChild(panels);
+
+      // Planet flavor section
+      const planetSection = document.createElement('div');
+      planetSection.className = 'planet-flavor-section';
+      planetSection.innerHTML = `<div class="planet-flavor-label">Planet Flavor Text</div>`;
+
+      for (const planet of theater.planets) {
+        const saved = planetFlavors[planet.name] || '';
+        const hasText = saved.length > 0;
+        const item = document.createElement('div');
+        item.className = 'planet-flavor-item';
+        item.innerHTML = `
+          <label class="planet-flavor-toggle">
+            <input type="checkbox" ${hasText ? 'checked' : ''} onchange="togglePlanetFlavor(this)">
+            <span>${escHtml(planet.name)}</span>
+          </label>
+          <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
+            data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
+        `;
+        planetSection.appendChild(item);
+      }
+
+      body.appendChild(planetSection);
+      card.appendChild(header);
+      card.appendChild(body);
+      container.appendChild(card);
+    }
+
+    // Wire up auto-save for all flavor textareas
+    container.querySelectorAll('textarea[data-scope]').forEach(ta => {
+      ta.addEventListener('input', () => saveFlavor(ta.dataset.scope, ta.dataset.key, ta.value));
+    });
+  }
+
+  function buildRefPanelHTML(theater, planetNotes) {
+    let html = '';
+
+    for (const p of theater.planets) {
+      const moTag = p.is_mo ? ' is-mo' : '';
+      const hazardLines = p.hazards.map(h =>
+        `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — ' + escHtml(h.description) : ''}</div>`
+      ).join('');
+      const savedNote = (planetNotes && planetNotes[p.name]) ? planetNotes[p.name] : '';
+      html += `
+        <div class="ref-planet">
+          <div class="ref-planet-name${moTag}">${escHtml(p.name)}${p.is_mo ? ' ★' : ''}</div>
+          <div class="ref-planet-stat">Players: ${p.player_count} | ${p.is_defense ? 'Defense' : 'Liberation'}: ${p.progress_pct}% | ${p.time_label}: ${p.liberation_time}</div>
+          ${p.biome ? `<div class="ref-planet-stat">Biome: ${escHtml(p.biome)}</div>` : ''}
+          ${p.biome_description ? `<div class="ref-planet-hazards" style="font-style:italic;color:#666">${escHtml(p.biome_description)}</div>` : ''}
+          ${hazardLines}
+          <div class="planet-notes-label">Notes</div>
+          <textarea class="planet-notes-input" data-scope="planet_notes" data-key="${escHtml(p.name)}">${escHtml(savedNote)}</textarea>
+        </div>`;
+    }
+
+    if (theater.mo) {
+      const mo = theater.mo;
+      const tasks = mo.tasks.map(t => `<div class="ref-mo-task">• ${escHtml(t)}</div>`).join('');
+      html += `
+        <div class="ref-mo">
+          <div class="ref-mo-label">MAJOR ORDER</div>
+          <div class="ref-mo-text">${escHtml(mo.briefing)}</div>
+          ${tasks}
+          <div class="ref-mo-text">Reward: ${escHtml(mo.reward)} | Expires: ${escHtml(mo.expires)}</div>
+        </div>`;
+    }
+
+    if (theater.dss) {
+      const dss = theater.dss;
+      const actionMap = { ACTIVE: 'large', FUNDING: 'small', COOLDOWN: 'none', INACTIVE: 'none' };
+      const actions = dss.actions.map(a => {
+        const cls = actionMap[a.status] || 'none';
+        const timing = a.timing ? ` | ${a.timing}` : '';
+        return `<div class="ref-dss-action ${cls}">${escHtml(a.name)}: ${a.status}${escHtml(timing)}</div>`;
+      }).join('');
+      html += `
+        <div class="ref-dss">
+          <div class="ref-dss-label">DSS — ${escHtml(dss.planet_name)}</div>
+          ${dss.ftl_jump ? `<div class="ref-dss-text">Next FTL Jump: ${escHtml(dss.ftl_jump)}</div>` : ''}
+          ${actions}
+        </div>`;
+    }
+
+    return html;
+  }
+
+  function togglePlanetFlavor(checkbox) {
+    const ta = checkbox.closest('.planet-flavor-item').querySelector('textarea');
+    ta.classList.toggle('visible', checkbox.checked);
+    if (!checkbox.checked) {
+      ta.value = '';
+      saveFlavor(ta.dataset.scope, ta.dataset.key, '');
+    } else {
+      ta.focus();
+    }
+  }
+
+  async function saveLimit(faction, limited) {
+    await fetch('/save_limit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faction, limited }),
+    });
+  }
+
+  async function saveFlavor(scope, key, value) {
+    await fetch('/save_flavor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope, key, value }),
+    });
+  }
+
+  // ── Search ────────────────────────────────────────────────────
 
   function searchIn(which) {
     const query = document.getElementById('search-' + which).value.trim().toLowerCase();
-    const textarea = document.getElementById('out-' + which);
-    const countEl = document.getElementById('count-' + which);
+    const state = searchState[which];
+    state.matches = [];
+    state.index = -1;
 
     if (!query) {
-      countEl.textContent = '';
+      document.getElementById('count-' + which).textContent = '';
       return;
     }
 
-    const text = textarea.value.toLowerCase();
-    let count = 0;
+    const text = document.getElementById('out-' + which).value.toLowerCase();
     let pos = 0;
     while ((pos = text.indexOf(query, pos)) !== -1) {
-      count++;
+      state.matches.push(pos);
       pos += query.length;
     }
 
-    countEl.textContent = count > 0 ? count + ' found' : 'not found';
-
-    if (count > 0) {
-      const firstPos = text.indexOf(query);
-      textarea.focus();
-      textarea.setSelectionRange(firstPos, firstPos + query.length);
+    if (state.matches.length === 0) {
+      document.getElementById('count-' + which).textContent = 'not found';
+      return;
     }
+
+    state.index = 0;
+    jumpToMatch(which, query.length);
   }
+
+  function searchNext(which) {
+    const state = searchState[which];
+    if (state.matches.length === 0) return;
+    state.index = (state.index + 1) % state.matches.length;
+    const query = document.getElementById('search-' + which).value.trim();
+    jumpToMatch(which, query.length);
+  }
+
+  function searchPrev(which) {
+    const state = searchState[which];
+    if (state.matches.length === 0) return;
+    state.index = (state.index - 1 + state.matches.length) % state.matches.length;
+    const query = document.getElementById('search-' + which).value.trim();
+    jumpToMatch(which, query.length);
+  }
+
+  function jumpToMatch(which, queryLen) {
+    const state = searchState[which];
+    const pos = state.matches[state.index];
+    const ta = document.getElementById('out-' + which);
+    ta.setSelectionRange(pos, pos + queryLen);
+    ta.blur();
+    document.getElementById('search-' + which).focus();
+    document.getElementById('count-' + which).textContent =
+      (state.index + 1) + ' of ' + state.matches.length;
+  }
+
+  // ── Help popup ────────────────────────────────────────────────
+
+  function toggleHelp(which) {
+    const popup = document.getElementById('help-' + which);
+    popup.classList.toggle('visible');
+  }
+
+  document.addEventListener('click', e => {
+    ['discord', 'video'].forEach(which => {
+      const popup = document.getElementById('help-' + which);
+      const btn = popup && popup.previousElementSibling;
+      if (popup && !popup.contains(e.target) && e.target !== btn) {
+        popup.classList.remove('visible');
+      }
+    });
+  });
 
   // ── Copy ──────────────────────────────────────────────────────
 
@@ -414,7 +838,6 @@
     try {
       await navigator.clipboard.writeText(text);
     } catch (e) {
-      // Fallback for browsers that block clipboard API
       const ta = document.getElementById('out-' + which);
       ta.select();
       document.execCommand('copy');
@@ -423,24 +846,24 @@
 
   // ── Char counter ──────────────────────────────────────────────
 
-  function updateCharCount(which) {
-    const ta = document.getElementById('out-' + which);
+  function updateCharCount() {
+    const ta = document.getElementById('out-discord');
     const len = ta.value.length;
-    const el = document.getElementById('chars-' + which);
-    if (which === 'discord') {
-      el.textContent = len + ' / 4000 characters';
-    }
+    document.getElementById('chars-discord').textContent = len + ' / 4000 characters';
   }
 
-  document.getElementById('out-discord').addEventListener('input', () => updateCharCount('discord'));
+  document.getElementById('out-discord').addEventListener('input', updateCharCount);
+  updateCharCount();
 
-  // Init char counts if outputs were pre-loaded from server
-  updateCharCount('discord');
+  {% if outputs %}
+  document.getElementById('reformat-btn').style.display = 'inline-block';
+  {% endif %}
 
   // ── Utility ───────────────────────────────────────────────────
 
   function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
 

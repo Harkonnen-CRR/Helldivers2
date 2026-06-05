@@ -71,6 +71,7 @@ def _build_planet(planet, campaigns_by_index, impact_multiplier, exostorm):  # E
         "current_owner": planet["currentOwner"],
         "player_count": player_count,
         "biome": planet["biome"]["name"],
+        "biome_description": planet["biome"].get("description", ""),
         "hazards": [{"name": h["name"], "description": h["description"]} for h in planet.get("hazards", [])],
         "progress_pct": progress_pct,
         "is_defense": is_defense,

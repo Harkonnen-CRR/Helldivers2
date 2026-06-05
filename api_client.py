@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import requests
 
@@ -16,8 +17,15 @@ ENDPOINTS = [
 ]
 
 def fetch_all():
-    for url, path in ENDPOINTS:
-        response = requests.get(url, headers=HEADERS)
+    for i, (url, path) in enumerate(ENDPOINTS):
+        if i > 0:
+            time.sleep(0.5)
+        for _ in range(3):
+            response = requests.get(url, headers=HEADERS)
+            if response.status_code != 429:
+                break
+            wait = int(response.headers.get('Retry-After', 5))
+            time.sleep(wait)
         response.raise_for_status()
         with open(path, "w") as f:
             json.dump(response.json(), f)

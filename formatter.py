@@ -302,15 +302,20 @@ def _format_dss_video(dss):
     return lines
 
 
-def format_discord(parsed_data, classifications):
+def format_discord(parsed_data, classifications, flavor_texts=None):
     """Formats parsed war data as Discord markdown.
 
     Args:
         parsed_data: dict from parse_all()
         classifications: dict from classify_items()
+        flavor_texts: optional dict with "theaters" and "planets" sub-dicts
     Returns:
         str of Discord markdown with character count footer
     """
+    flavor_texts = flavor_texts or {}
+    theater_flavors = flavor_texts.get("theaters", {})
+    planet_flavors = flavor_texts.get("planets", {})
+
     lines = []
     mo = parsed_data.get("major_order")
     dss = parsed_data.get("dss")
@@ -331,10 +336,16 @@ def format_discord(parsed_data, classifications):
         lines.append("")
 
     theater_order, theaters = _build_theaters(parsed_data)
+    limits = flavor_texts.get("limits", {})
+    for faction in theater_order:
+        if limits.get(faction):
+            theaters[faction] = theaters[faction][:1]
 
     for faction in theater_order:
         lines.append(f"**{faction.upper()} FRONT**")
-        lines.append("*[THEATER FLAVOR TEXT]*")
+        theater_text = theater_flavors.get(faction)
+        if theater_text:
+            lines.append(f"*{theater_text}*")
         lines.append("")
 
         for planet in theaters[faction]:
@@ -365,7 +376,9 @@ def format_discord(parsed_data, classifications):
                 ex = planet["exostorm"]
                 lines.append(f"> **Exostorm** — *[MANUAL INPUT]* Class: {ex['class']}")
 
-            lines.append("> *[PLANET FLAVOR TEXT]*")
+            planet_text = planet_flavors.get(planet["name"])
+            if planet_text:
+                lines.append(f"> *{planet_text}*")
             lines.append("")
 
     if dss:
@@ -379,15 +392,20 @@ def format_discord(parsed_data, classifications):
     return text
 
 
-def format_video(parsed_data, classifications):
+def format_video(parsed_data, classifications, flavor_texts=None):
     """Formats parsed war data as plain text for video scripts.
 
     Args:
         parsed_data: dict from parse_all()
         classifications: dict from classify_items()
+        flavor_texts: optional dict with "theaters" and "planets" sub-dicts
     Returns:
         str of plain text with no markdown
     """
+    flavor_texts = flavor_texts or {}
+    theater_flavors = flavor_texts.get("theaters", {})
+    planet_flavors = flavor_texts.get("planets", {})
+
     MAJOR_SEP = "================================================"
     MINOR_SEP = "------------------------------------------------"
 
@@ -417,12 +435,18 @@ def format_video(parsed_data, classifications):
         lines.append("")
 
     theater_order, theaters = _build_theaters(parsed_data)
+    limits = flavor_texts.get("limits", {})
+    for faction in theater_order:
+        if limits.get(faction):
+            theaters[faction] = theaters[faction][:1]
 
     for faction in theater_order:
         lines.append(MAJOR_SEP)
         lines.append(f"{faction.upper()} FRONT")
         lines.append(MAJOR_SEP)
-        lines.append("[THEATER FLAVOR TEXT]")
+        theater_text = theater_flavors.get(faction)
+        if theater_text:
+            lines.append(theater_text)
         lines.append("")
 
         for planet in theaters[faction]:
@@ -456,7 +480,9 @@ def format_video(parsed_data, classifications):
                 ex = planet["exostorm"]
                 lines.append(f"      EXOSTORM [MANUAL INPUT] — Class: {ex['class']}")
 
-            lines.append("    [PLANET FLAVOR TEXT]")
+            planet_text = planet_flavors.get(planet["name"])
+            if planet_text:
+                lines.append(f"    {planet_text}")
             lines.append("")
 
     if dss:
@@ -464,6 +490,104 @@ def format_video(parsed_data, classifications):
         lines.extend(_format_dss_video(dss))
 
     return "\n".join(lines)
+
+
+def _dss_action_timing(action):
+    status = action["status_label"]
+    if status in ("cooldown", "active") and action.get("status_expire"):
+        label = "Ready in" if status == "cooldown" else "Active for"
+        return f"{label}: {format_duration(_time_remaining_hours(action['status_expire']))}"
+    if status == "funding":
+        fps = action.get("funding_progress", [])
+        if fps:
+            fp = fps[0]
+            remaining = fp["target"] - fp["current"]
+            if fp["delta_per_second"] > 0:
+                eta = format_duration((remaining / fp["delta_per_second"]) / 3600)
+                pct = round((fp["current"] / fp["target"]) * 100, 1)
+                return f"{pct}% funded | ETA: {eta}"
+    return None
+
+
+def get_theater_data(parsed_data, limits=None):
+    """Returns structured theater data for the flavor editor reference panels.
+
+    Pre-formats all durations and task labels so the JS template has no calculation to do.
+    Returns a list of theater dicts, one per faction, in display order.
+    """
+    limits = limits or {}
+    theater_order, theaters = _build_theaters(parsed_data)
+    for faction in theater_order:
+        if limits.get(faction):
+            theaters[faction] = theaters[faction][:1]
+    mo = parsed_data.get("major_order")
+    dss = parsed_data.get("dss")
+    mo_indices = _get_mo_planet_indices(parsed_data)
+
+    mo_task_labels = []
+    if mo:
+        planet_index_to_name = _load_planet_index_to_name()
+        mo_task_labels = [_render_task_label(t, planet_index_to_name) for t in mo.get("tasks", [])]
+
+    result = []
+    for faction in theater_order:
+        planets = theaters[faction]
+        mo_relevant = any(p["index"] in mo_indices for p in planets)
+        dss_in_theater = dss and any(p["index"] == dss["planet_index"] for p in planets)
+
+        planet_refs = []
+        for p in planets:
+            hazards = [
+                {"name": h["name"], "description": h.get("description", "")}
+                for h in p.get("hazards", []) if h.get("name") and h["name"] != "None"
+            ]
+            planet_refs.append({
+                "name": p["name"],
+                "player_count": f"{p['player_count']:,}",
+                "progress_pct": p["progress_pct"],
+                "liberation_time": format_duration(p["liberation_time_hours"]),
+                "time_label": "Time to defense" if p["is_defense"] else "Time to liberation",
+                "is_defense": p["is_defense"],
+                "is_mo": p["index"] in mo_indices,
+                "biome": p.get("biome", ""),
+                "biome_description": p.get("biome_description", ""),
+                "hazards": hazards,
+            })
+
+        mo_ref = None
+        if mo and mo_relevant:
+            reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], "Unknown")
+            mo_ref = {
+                "briefing": mo["briefing"],
+                "reward": f"{mo['reward_amount']} {reward_label}",
+                "expires": format_duration(_time_remaining_hours(mo["expiration"])),
+                "tasks": mo_task_labels,
+            }
+
+        dss_ref = None
+        if dss_in_theater:
+            ftl = format_duration(_time_remaining_hours(dss["election_end"])) if dss.get("election_end") else None
+            dss_ref = {
+                "planet_name": dss["planet_name"],
+                "ftl_jump": ftl,
+                "actions": [
+                    {
+                        "name": a["name"],
+                        "status": a["status_label"].upper(),
+                        "timing": _dss_action_timing(a),
+                    }
+                    for a in dss["tactical_actions"]
+                ],
+            }
+
+        result.append({
+            "faction": faction,
+            "planets": planet_refs,
+            "mo": mo_ref,
+            "dss": dss_ref,
+        })
+
+    return result
 
 
 def save_outputs(discord_text, video_text):
@@ -484,16 +608,20 @@ def save_outputs(discord_text, video_text):
     print(f"Saved video script to {video_path}")
 
 
-def format_all(parsed_data, classifications):
+def format_all(parsed_data, classifications, flavor_texts=None):
     """Produces both Discord and video text outputs from parsed war data.
 
     Args:
         parsed_data: dict from parse_all()
         classifications: dict from classify_items()
+        flavor_texts: optional dict with "theaters" and "planets" sub-dicts
     Returns:
         tuple of (discord_text, video_text)
     """
-    return format_discord(parsed_data, classifications), format_video(parsed_data, classifications)
+    return (
+        format_discord(parsed_data, classifications, flavor_texts),
+        format_video(parsed_data, classifications, flavor_texts),
+    )
 
 
 if __name__ == "__main__":

@@ -6,16 +6,19 @@ from flask import Flask, jsonify, render_template, request
 
 from api_client import fetch_all
 from data_parser import parse_all
-from formatter import format_discord, format_video
+from formatter import format_discord, format_video, get_theater_data
 
 app = Flask(__name__)
 
 CLASSIFICATIONS_PATH = "data/classifications.json"
+FLAVOR_PATH = "data/flavor.json"
 
 state = {
     "snapshot1_defense": {},
     "snapshot1_time": None,
     "classifications": {},
+    "flavor": {},
+    "last_parsed": None,
     "last_outputs": None,
 }
 
@@ -37,17 +40,36 @@ def _save_classifications(classifications):
         json.dump(classifications, f, indent=2)
 
 
-def _get_classification_items(parsed_data):
+def _load_flavor():
+    if os.path.exists(FLAVOR_PATH):
+        with open(FLAVOR_PATH) as f:
+            data = json.load(f)
+        data.setdefault("theaters", {})
+        data.setdefault("planets", {})
+        data.setdefault("limits", {})
+        data.setdefault("planet_notes", {})
+        return data
+    return {"theaters": {}, "planets": {}, "limits": {}, "planet_notes": {}}
+
+
+def _save_flavor(flavor):
+    os.makedirs("data", exist_ok=True)
+    with open(FLAVOR_PATH, "w") as f:
+        json.dump(flavor, f, indent=2)
+
+
+def _get_classification_items(raw_planets):
     items = {}
-    for planet in parsed_data.get("planets", []):
+    for planet in raw_planets:
         for hazard in planet.get("hazards", []):
-            if not hazard.get("name") or hazard["name"] == "None":
+            name = hazard.get("name", "")
+            if not name or name == "None":
                 continue
-            key = f"hazard_{hazard['name']}"
+            key = f"hazard_{name}"
             if key not in items:
                 items[key] = {
-                    "label": hazard["name"],
-                    "description": hazard["description"],
+                    "label": name,
+                    "description": hazard.get("description", ""),
                 }
     return items
 
@@ -55,6 +77,7 @@ def _get_classification_items(parsed_data):
 @app.route("/")
 def index():
     state["classifications"] = _load_classifications()
+    state["flavor"] = _load_flavor()
     return render_template(
         "index.html",
         classifications=state["classifications"],
@@ -82,7 +105,7 @@ def refresh():
     state["snapshot1_defense"] = snapshot1_defense
 
     parsed = parse_all()
-    items = _get_classification_items(parsed)
+    items = _get_classification_items(raw_planets)
 
     saved = state["classifications"]
     items_with_state = {
@@ -94,7 +117,14 @@ def refresh():
         for key, item in items.items()
     }
 
-    return jsonify({"status": "ok", "items": items_with_state})
+    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}))
+
+    return jsonify({
+        "status": "ok",
+        "items": items_with_state,
+        "theaters": theaters,
+        "flavor": state["flavor"],
+    })
 
 
 @app.route("/fetch2", methods=["POST"])
@@ -122,10 +152,28 @@ def fetch2():
                 net_rate = (health1 - health2) / elapsed
                 planet["liberation_time_hours"] = (health2 / net_rate) / 3600
 
-    discord_text = format_discord(parsed, state["classifications"])
-    video_text = format_video(parsed, state["classifications"])
+    state["last_parsed"] = parsed
+    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}))
+    discord_text = format_discord(parsed, state["classifications"], state["flavor"])
+    video_text = format_video(parsed, state["classifications"], state["flavor"])
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
 
+    return jsonify({
+        "status": "ok",
+        "discord": discord_text,
+        "video": video_text,
+        "theaters": theaters,
+        "flavor": state["flavor"],
+    })
+
+
+@app.route("/reformat", methods=["POST"])
+def reformat():
+    if state["last_parsed"] is None:
+        return jsonify({"status": "error", "message": "No data — run Refresh first"}), 400
+    discord_text = format_discord(state["last_parsed"], state["classifications"], state["flavor"])
+    video_text = format_video(state["last_parsed"], state["classifications"], state["flavor"])
+    state["last_outputs"] = {"discord": discord_text, "video": video_text}
     return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
 
 
@@ -140,6 +188,37 @@ def save_classifications():
         return jsonify({"status": "error", "message": "Invalid tier value"}), 400
     state["classifications"][key] = value
     _save_classifications(state["classifications"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_flavor", methods=["POST"])
+def save_flavor():
+    data = request.get_json()
+    scope = data.get("scope")
+    key = data.get("key")
+    value = data.get("value", "")
+    if scope not in ("theaters", "planets", "planet_notes") or not key:
+        return jsonify({"status": "error", "message": "Invalid scope or key"}), 400
+    if value:
+        state["flavor"][scope][key] = value
+    else:
+        state["flavor"][scope].pop(key, None)
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_limit", methods=["POST"])
+def save_limit():
+    data = request.get_json()
+    faction = data.get("faction")
+    limited = data.get("limited")
+    if not faction or not isinstance(limited, bool):
+        return jsonify({"status": "error", "message": "Invalid request"}), 400
+    if limited:
+        state["flavor"]["limits"][faction] = True
+    else:
+        state["flavor"]["limits"].pop(faction, None)
+    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
