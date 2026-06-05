@@ -15,8 +15,13 @@ ENDPOINTS = [
     ("https://api.helldivers2.dev/api/v1/war", "data/war.json"),
 ]
 
-for url, path in ENDPOINTS:
-    response = requests.get(url, headers=HEADERS)
-    response.raise_for_status()
-    with open(path, "w") as f:
-        json.dump(response.json(), f)
+def fetch_all():
+    for url, path in ENDPOINTS:
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+        with open(path, "w") as f:
+            json.dump(response.json(), f)
+
+
+if __name__ == "__main__":
+    fetch_all()
