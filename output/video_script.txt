@@ -1,0 +1,104 @@
+================================================
+GALACTIC WAR UPDATE
+================================================
+
+MAJOR ORDER
+------------------------------------------------
+    Title: MAJOR ORDER
+    Briefing: Defend the Magma Planets from the Cyborg and Automaton assault.
+    Reward: 55 Super Credits
+    Expires in: 3d 12hr 17min
+    Tasks:
+      - Defend K
+      - Defend FURY
+
+================================================
+AUTOMATON FRONT
+================================================
+[THEATER FLAVOR TEXT]
+
+------------------------------------------------
+MATAR BAY (DSS IN ORBIT)
+------------------------------------------------
+    Sector: Andromeda | Biome: Plains
+    Campaign Level: 15 | Type: Defense
+    Players: 29,780
+    Defense Progress: 81.07%
+    Time to defense: calculating...
+    Regen/sec: 0
+    [PLANET FLAVOR TEXT]
+
+================================================
+TERMINIDS FRONT
+================================================
+[THEATER FLAVOR TEXT]
+
+------------------------------------------------
+ACAMAR IV
+------------------------------------------------
+    Sector: Jin Xi | Biome: Plains
+    Campaign Level: 39 | Type: Liberation
+    Players: 4,045
+    Liberation Progress: 0.19%
+    Time to liberation: 3hr 56min
+    Regen/sec: 2.7777777
+    [PLANET FLAVOR TEXT]
+
+------------------------------------------------
+GATRIA
+------------------------------------------------
+    Sector: Jin Xi | Biome: Ionic Crimson
+    Campaign Level: 15 | Type: Liberation
+    Players: 2,114
+    Liberation Progress: 0.0%
+    Time to liberation: 7hr 43min
+    Regen/sec: 2.7777777
+    Hazards:
+      ION STORMS — Ion storms intermittently disable Stratagems.
+    [PLANET FLAVOR TEXT]
+
+------------------------------------------------
+GRAND ERRANT
+------------------------------------------------
+    Sector: Farsight | Biome: Scorched Moor
+    Campaign Level: 3 | Type: Liberation
+    Players: 1,246
+    Liberation Progress: 0.0%
+    Time to liberation: 9hr 3min
+    Regen/sec: 2.7777777
+    Hazards:
+      FIRE TORNADOES — Planet is ravaged by deadly fire tornadoes.
+    [PLANET FLAVOR TEXT]
+
+================================================
+ILLUMINATE FRONT
+================================================
+[THEATER FLAVOR TEXT]
+
+------------------------------------------------
+HYDROBIUS
+------------------------------------------------
+    Sector: Omega | Biome: Desert Cliffs
+    Campaign Level: 8 | Type: Liberation
+    Players: 1,673
+    Liberation Progress: 0.0%
+    Time to liberation: 9hr 33min
+    Regen/sec: 4.1666665
+    Hazards:
+      TREMORS — Frequent earthquakes stun players and enemies alike.
+    [PLANET FLAVOR TEXT]
+
+================================================
+    DEMOCRATIC SPACE STATION
+    Location: MATAR BAY
+    Next FTL Jump: 2hr 38min
+    Tactical Actions:
+      EAGLE STORM — COOLDOWN | Time remaining: 15hr 7min
+        Eagle Airstrikes during missions. Slows enemy progress in Defense Campaigns.
+        Funding: 0 / 86400 (+0.0000/sec)
+      ORBITAL BLOCKADE — funding
+        Defense Campaigns cannot originate from this planet. The Hellpod Space Optimization Booster is automatically active for all missions.
+        Funding: 70401 / 86400 (+0.2273/sec)
+      HEAVY ORDNANCE DISTRIBUTION — COOLDOWN | Time remaining: 1hr 22min
+        Orbital 380mm HE Barrage stratagem during missions. Accelerates progress in Liberation Campaigns.
+        Funding: 0 / 86400 (+0.0000/sec)

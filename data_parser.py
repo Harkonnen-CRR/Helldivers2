@@ -57,7 +57,7 @@ def _build_planet(planet, campaigns_by_index, impact_multiplier, exostorm):  # E
     else:
         event = None
 
-    is_defense = raw_event is not None
+    is_defense = raw_event is not None and raw_event.get("eventType") == 1
     contest_health = raw_event["health"] if is_defense else health
     contest_max_health = raw_event["maxHealth"] if is_defense else max_health
 
