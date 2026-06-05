@@ -48,6 +48,12 @@ _DSS_ITEM_MIX_MAP = {
     3992382197: "Common Samples",
 }
 
+_FACTION_VARIANT_TAGS = {
+    "Terminids": ["Predator Strain", "Spore Spewer", "Shriekers"],
+    "Automaton": ["Jet Brigade"],
+    "Illuminate": ["Appropriators"],
+}
+
 
 def _load_planet_index_to_name():
     with open(os.path.join("data", "planets.json")) as f:
@@ -136,7 +142,7 @@ def _format_defense_time(planet):
     if lib_time is None:
         return ("Time to Defense", "Establishing a Beachhead")
     if event_remaining is not None and lib_time > event_remaining:
-        return (None, f"Lost in {format_duration(event_remaining)}")
+        return (None, f"Planet Lost in {format_duration(event_remaining)}")
     return (None, f"Planet Defended in {format_duration(lib_time)}")
 
 
@@ -434,7 +440,11 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                 else:
                     lines.append(f"> {d_time}")
             else:
-                lines.append(f"> **Time to Liberation:** {_format_lib_time(planet['liberation_time_hours'])}")
+                lib_str = _format_lib_time(planet["liberation_time_hours"])
+                if planet["liberation_time_hours"] is not None:
+                    lines.append(f"> **Time to Liberation:** {lib_str}")
+                else:
+                    lines.append(f"> {lib_str}")
             lines.append(f"> **Regen/sec:** {planet['regen_per_second']:.2f}")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
@@ -442,6 +452,11 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                 lines.append("> **Hazards:**")
                 for hazard in hazards:
                     lines.append(f"> {_format_hazard_discord(hazard, classifications)}")
+
+            active_tags = (flavor_texts.get("planet_tags") or {}).get(planet["name"], [])
+            if active_tags:
+                tag_label = "Active Variants" if len(active_tags) > 1 else "Active Variant"
+                lines.append(f"> **⚠ {tag_label}:** {', '.join(active_tags)}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0]
             if active_regions:
@@ -553,7 +568,11 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 else:
                     lines.append(f"    {d_time}")
             else:
-                lines.append(f"    Time to Liberation: {_format_lib_time(planet['liberation_time_hours'])}")
+                lib_str = _format_lib_time(planet["liberation_time_hours"])
+                if planet["liberation_time_hours"] is not None:
+                    lines.append(f"    Time to Liberation: {lib_str}")
+                else:
+                    lines.append(f"    {lib_str}")
             lines.append(f"    Regen/sec: {planet['regen_per_second']:.2f}")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
@@ -561,6 +580,11 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 lines.append("    Hazards:")
                 for hazard in hazards:
                     lines.append(f"      {_format_hazard_video(hazard, classifications)}")
+
+            active_tags = (flavor_texts.get("planet_tags") or {}).get(planet["name"], [])
+            if active_tags:
+                tag_label = "Active Variants" if len(active_tags) > 1 else "Active Variant"
+                lines.append(f"    {tag_label}: {', '.join(active_tags)}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0]
             if active_regions:
@@ -605,13 +629,14 @@ def _dss_action_timing(action):
     return None
 
 
-def get_theater_data(parsed_data, limits=None):
+def get_theater_data(parsed_data, limits=None, classifications=None):
     """Returns structured theater data for the flavor editor reference panels.
 
     Pre-formats all durations and task labels so the JS template has no calculation to do.
     Returns a list of theater dicts, one per faction, in display order.
     """
     limits = limits or {}
+    classifications = classifications or {}
     theater_order, theaters = _build_theaters(parsed_data)
     for faction in theater_order:
         if limits.get(faction):
@@ -634,14 +659,22 @@ def get_theater_data(parsed_data, limits=None):
         planet_refs = []
         for p in planets:
             hazards = [
-                {"name": h["name"], "description": h.get("description", "")}
+                {
+                    "name": h["name"],
+                    "description": h.get("description", ""),
+                    "key": f"hazard_{h['name']}",
+                    "tier": classifications.get(f"hazard_{h['name']}", "none"),
+                }
                 for h in p.get("hazards", []) if h.get("name") and h["name"] != "None"
             ]
+            enemy_faction = _enemy_faction(p)
+            variant_tags = _FACTION_VARIANT_TAGS.get(enemy_faction, [])
             if p["is_defense"]:
                 d_label, d_time = _format_defense_time(p)
                 time_status = f"{d_label}: {d_time}" if d_label else d_time
             else:
-                time_status = f"Time to Liberation: {_format_lib_time(p['liberation_time_hours'])}"
+                lib_str = _format_lib_time(p["liberation_time_hours"])
+                time_status = f"Time to Liberation: {lib_str}" if p["liberation_time_hours"] is not None else lib_str
             regions = []
             for r in p.get("regions", []):
                 pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
@@ -664,6 +697,7 @@ def get_theater_data(parsed_data, limits=None):
                 "biome_description": p.get("biome_description", ""),
                 "hazards": hazards,
                 "regions": regions,
+                "variant_tags": variant_tags,
             })
 
         mo_ref = None
@@ -685,8 +719,10 @@ def get_theater_data(parsed_data, limits=None):
                 "actions": [
                     {
                         "name": a["name"],
-                        "status": a["status_label"].upper(),
-                        "timing": _dss_action_timing(a),
+                        "status": a["status_label"],
+                        "cost_label": _dss_cost_label(a),
+                        "phrase": _dss_status_phrase(a),
+                        "description": _strip_html(a["strategic_description"]),
                     }
                     for a in dss["tactical_actions"]
                 ],

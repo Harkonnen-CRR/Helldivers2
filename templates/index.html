@@ -206,10 +206,12 @@
     .ref-dss { background: #001a2a; border: 1px solid #003a5a; border-radius: 3px; padding: 8px; margin-top: 8px; }
     .ref-dss-label { color: #60c0f0; font-size: 11px; font-weight: bold; margin-bottom: 4px; }
     .ref-dss-text { color: #80a0c0; font-size: 11px; }
-    .ref-dss-action { font-size: 11px; }
-    .ref-dss-action.large { color: #f0c040; font-weight: bold; }
-    .ref-dss-action.small { color: #a0c0e0; }
-    .ref-dss-action.none  { color: #555; }
+    .ref-dss-action { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+    .ref-dss-action.active   { color: #f0c040; font-weight: bold; }
+    .ref-dss-action.funding  { color: #a0c0e0; }
+    .ref-dss-action.cooldown { color: #555; }
+    .ref-dss-action.inactive { color: #444; }
+    .ref-dss-action-desc { font-size: 10px; color: #555; font-style: italic; padding-left: 10px; margin-bottom: 4px; }
 
     .planet-notes-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; margin-bottom: 3px; }
     textarea.planet-notes-input {
@@ -230,7 +232,15 @@
     .planet-flavor-section { border-top: 1px solid #222; padding-top: 12px; }
     .planet-flavor-label { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
 
-    .planet-flavor-item { margin-bottom: 8px; }
+    .planet-flavor-item { margin-bottom: 12px; }
+    .planet-subgroup-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; margin-bottom: 4px; }
+    .planet-hazard-tiers { margin-left: 22px; }
+    .planet-hazard-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .planet-hazard-name { color: #888; font-size: 11px; min-width: 120px; }
+    .planet-variant-tags { margin-left: 22px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .planet-tag-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; color: #aaa; padding: 2px 6px; border: 1px solid #333; border-radius: 2px; }
+    .planet-tag-toggle input[type=checkbox] { accent-color: #f0c040; cursor: pointer; }
+    .planet-tag-toggle:has(input:checked) { color: #f0c040; border-color: #f0c040; background: #1a1600; }
     .planet-flavor-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
     .planet-flavor-toggle input[type=checkbox] { accent-color: #80d080; cursor: pointer; }
     .planet-flavor-toggle span { color: #c0c0c0; font-size: 12px; }
@@ -319,16 +329,20 @@
       <h1>SEAF DAILY BRIEFING</h1>
       <h2>Hark the Helldiver — War Update Dashboard</h2>
     </div>
-    <button id="refresh-btn" onclick="startRefresh()">⟳ REFRESH DATA</button>
+    <button id="refresh-btn" onclick="startRefresh()">⟳ RUN CALCULATIONS</button>
     <button id="cancel-btn" class="cancel" onclick="cancelRefresh()" style="display:none">✕ CANCEL</button>
     <button id="reformat-btn" class="secondary" onclick="reformat()" style="display:none">↺ REFRESH TEXT</button>
     <span id="status-msg"></span>
   </div>
 
-  <!-- Classification panel -->
-  <div class="section">
-    <h3>Hazard Classifications</h3>
-    <div id="hazard-list">
+  <!-- Classification panel (collapsed by default — per-planet controls are in the flavor editor) -->
+  <div class="section" id="classifications-section">
+    <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleClassificationsPanel()">
+      <h3 style="margin:0">Hazard Classifications</h3>
+      <span style="color:#555;font-size:11px">(per-planet — expand for global view)</span>
+      <span id="class-toggle-icon" style="color:#555;margin-left:auto">▼ Show</span>
+    </div>
+    <div id="hazard-list" style="display:none;margin-top:10px">
       {% if classifications %}
         {% for key, tier in classifications.items() %}
           {% if key.startswith('hazard_') %}
@@ -426,6 +440,15 @@
 
   // ── Refresh flow ──────────────────────────────────────────────
 
+  function apiErrorMessage(data) {
+    const type = data.error_type || 'unknown';
+    if (type === 'down')        return '⚠ helldivers2.dev is returning ' + data.message + ' — the API is likely down. Try again in a few minutes.';
+    if (type === 'timeout')     return '⚠ API request timed out — helldivers2.dev may be slow or unreachable. Try again shortly.';
+    if (type === 'rate_limit')  return '⚠ Rate limited by the API — wait a moment, then try again.';
+    if (type === 'server_error') return '⚠ API server error — helldivers2.dev may be having issues (' + data.message + ').';
+    return '⚠ ' + data.message;
+  }
+
   async function startRefresh() {
     setStatus('Fetching data...');
     document.getElementById('refresh-btn').disabled = true;
@@ -435,13 +458,13 @@
       res = await fetch('/refresh', { method: 'POST' });
       data = await res.json();
     } catch (e) {
-      setStatus('Network error — click Refresh to retry.');
+      setStatus('⚠ Cannot reach the local server — is Flask running?');
       document.getElementById('refresh-btn').disabled = false;
       return;
     }
 
     if (data.status !== 'ok') {
-      setStatus('Error: ' + data.message + ' — click Refresh to retry.');
+      setStatus(apiErrorMessage(data) + ' — click Run Calculations to retry.');
       document.getElementById('refresh-btn').disabled = false;
       return;
     }
@@ -482,7 +505,7 @@
       res = await fetch('/fetch2', { method: 'POST' });
       data = await res.json();
     } catch (e) {
-      setStatus('Network error: ' + e.message);
+      setStatus('⚠ Cannot reach the local server — is Flask running?');
       resetAfterFetch();
       return;
     }
@@ -490,7 +513,7 @@
     resetAfterFetch();
 
     if (data.status !== 'ok') {
-      setStatus('Error: ' + data.message);
+      setStatus(apiErrorMessage(data) + ' — second fetch failed, liberation rates unavailable.');
       return;
     }
 
@@ -523,7 +546,9 @@
   }
 
   function setStatus(msg) {
-    document.getElementById('status-msg').textContent = msg;
+    const el = document.getElementById('status-msg');
+    el.style.color = msg.startsWith('⚠') ? '#ff6060' : '#d08080';
+    el.textContent = msg;
   }
 
   // ── Reformat ──────────────────────────────────────────────────
@@ -577,11 +602,52 @@
   }
 
   async function saveTier(key, value) {
-    await fetch('/save_classifications', {
+    const res = await fetch('/save_classifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value }),
     });
+    const data = await res.json();
+    if (data.final_tier) {
+      // Sync every radio group for this key to the actual saved tier (max-wins)
+      document.querySelectorAll(`input[name="${key}"]`).forEach(r => {
+        r.checked = (r.value === data.final_tier);
+      });
+    }
+    scheduleReformat();
+  }
+
+  let _reformatTimer = null;
+
+  function scheduleReformat() {
+    clearTimeout(_reformatTimer);
+    _reformatTimer = setTimeout(() => {
+      if (document.getElementById('reformat-btn').style.display !== 'none') reformat();
+    }, 1000);
+  }
+
+  function toggleClassificationsPanel() {
+    const list = document.getElementById('hazard-list');
+    const icon = document.getElementById('class-toggle-icon');
+    const shown = list.style.display !== 'none';
+    list.style.display = shown ? 'none' : '';
+    icon.textContent = shown ? '▼ Show' : '▲ Hide';
+  }
+
+  async function saveTags(planetName, tags) {
+    await fetch('/save_tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planet: planetName, tags }),
+    });
+    scheduleReformat();
+  }
+
+  function handleTagChange(planetName, checkbox) {
+    const item = checkbox.closest('.planet-flavor-item');
+    const allBoxes = item.querySelectorAll('.planet-variant-tags input[type=checkbox]');
+    const activeTags = Array.from(allBoxes).filter(cb => cb.checked).map(cb => cb.dataset.tag);
+    saveTags(planetName, activeTags);
   }
 
   // ── Flavor editor ─────────────────────────────────────────────
@@ -651,9 +717,45 @@
       planetSection.className = 'planet-flavor-section';
       planetSection.innerHTML = `<div class="planet-flavor-label">Planet Flavor Text</div>`;
 
+      const planetTags = (flavor && flavor.planet_tags) ? flavor.planet_tags : {};
+
       for (const planet of theater.planets) {
         const saved = planetFlavors[planet.name] || '';
         const hasText = saved.length > 0;
+        const activeTags = planetTags[planet.name] || [];
+
+        // Hazard tier section
+        let hazardTierHTML = '';
+        if (planet.hazards && planet.hazards.length > 0) {
+          hazardTierHTML = `<div class="planet-hazard-tiers"><div class="planet-subgroup-label">Hazard Effects</div>`;
+          for (const h of planet.hazards) {
+            hazardTierHTML += `
+              <div class="planet-hazard-row">
+                <span class="planet-hazard-name">${escHtml(h.name)}</span>
+                <span class="tier-radios">
+                  <label class="tier-large"><input type="radio" name="${escHtml(h.key)}" value="large" ${h.tier === 'large' ? 'checked' : ''} onchange="saveTier('${escHtml(h.key)}', 'large')"> Large</label>
+                  <label class="tier-small"><input type="radio" name="${escHtml(h.key)}" value="small" ${h.tier === 'small' ? 'checked' : ''} onchange="saveTier('${escHtml(h.key)}', 'small')"> Small</label>
+                  <label class="tier-none"><input type="radio" name="${escHtml(h.key)}" value="none" ${h.tier === 'none' ? 'checked' : ''} onchange="saveTier('${escHtml(h.key)}', 'none')"> None</label>
+                </span>
+              </div>`;
+          }
+          hazardTierHTML += '</div>';
+        }
+
+        // Variant tags section
+        let tagsHTML = '';
+        if (planet.variant_tags && planet.variant_tags.length > 0) {
+          tagsHTML = `<div class="planet-variant-tags"><div class="planet-subgroup-label" style="width:100%">Active Variants</div>`;
+          for (const tag of planet.variant_tags) {
+            const checked = activeTags.includes(tag) ? 'checked' : '';
+            tagsHTML += `<label class="planet-tag-toggle">
+              <input type="checkbox" data-tag="${escHtml(tag)}" ${checked} onchange="handleTagChange('${escHtml(planet.name)}', this)">
+              ${escHtml(tag)}
+            </label>`;
+          }
+          tagsHTML += '</div>';
+        }
+
         const item = document.createElement('div');
         item.className = 'planet-flavor-item';
         item.innerHTML = `
@@ -663,6 +765,8 @@
           </label>
           <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
             data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
+          ${hazardTierHTML}
+          ${tagsHTML}
         `;
         planetSection.appendChild(item);
       }
@@ -721,16 +825,16 @@
 
     if (theater.dss) {
       const dss = theater.dss;
-      const actionMap = { ACTIVE: 'large', FUNDING: 'small', COOLDOWN: 'none', INACTIVE: 'none' };
       const actions = dss.actions.map(a => {
-        const cls = actionMap[a.status] || 'none';
-        const timing = a.timing ? ` | ${a.timing}` : '';
-        return `<div class="ref-dss-action ${cls}">${escHtml(a.name)}: ${a.status}${escHtml(timing)}</div>`;
+        const cost = a.cost_label ? ` (${escHtml(a.cost_label)})` : '';
+        const desc = a.description
+          ? `<div class="ref-dss-action-desc">│ ${escHtml(a.description)}</div>`
+          : '';
+        return `<div class="ref-dss-action ${escHtml(a.status)}"><strong>${escHtml(a.name)}</strong>${cost} — ${escHtml(a.phrase)}</div>${desc}`;
       }).join('');
       html += `
         <div class="ref-dss">
-          <div class="ref-dss-label">DSS — ${escHtml(dss.planet_name)}</div>
-          ${dss.ftl_jump ? `<div class="ref-dss-text">Next FTL Jump: ${escHtml(dss.ftl_jump)}</div>` : ''}
+          <div class="ref-dss-label">DSS — ${escHtml(dss.planet_name)}${dss.ftl_jump ? ` (${escHtml(dss.ftl_jump)} until FTL jump)` : ''}</div>
           ${actions}
         </div>`;
     }
@@ -757,20 +861,13 @@
     });
   }
 
-  let _reformatTimer = null;
-
   async function saveFlavor(scope, key, value) {
     await fetch('/save_flavor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scope, key, value }),
     });
-    clearTimeout(_reformatTimer);
-    _reformatTimer = setTimeout(() => {
-      if (document.getElementById('reformat-btn').style.display !== 'none') {
-        reformat();
-      }
-    }, 1000);
+    scheduleReformat();
   }
 
   // ── Search ────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
 
-from api_client import fetch_all
+from api_client import fetch_all, ApiError
 from data_parser import parse_all
 from formatter import format_discord, format_video, get_theater_data
 
@@ -21,6 +21,16 @@ state = {
     "last_parsed": None,
     "last_outputs": None,
 }
+
+
+def _api_error_type(status_code):
+    if status_code is None:
+        return "timeout"
+    if status_code == 429:
+        return "rate_limit"
+    if status_code in (502, 503, 504):
+        return "down"
+    return "server_error"
 
 
 def _load_classifications():
@@ -40,6 +50,9 @@ def _save_classifications(classifications):
         json.dump(classifications, f, indent=2)
 
 
+_TIER_PRIORITY = {"large": 2, "small": 1, "none": 0}
+
+
 def _load_flavor():
     if os.path.exists(FLAVOR_PATH):
         with open(FLAVOR_PATH) as f:
@@ -48,8 +61,9 @@ def _load_flavor():
         data.setdefault("planets", {})
         data.setdefault("limits", {})
         data.setdefault("planet_notes", {})
+        data.setdefault("planet_tags", {})
         return data
-    return {"theaters": {}, "planets": {}, "limits": {}, "planet_notes": {}}
+    return {"theaters": {}, "planets": {}, "limits": {}, "planet_notes": {}, "planet_tags": {}}
 
 
 def _save_flavor(flavor):
@@ -89,8 +103,10 @@ def index():
 def refresh():
     try:
         fetch_all()
+    except ApiError as e:
+        return jsonify({"status": "error", "message": str(e), "error_type": _api_error_type(e.status_code)}), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e), "error_type": "unknown"}), 200
 
     state["snapshot1_time"] = datetime.now()
 
@@ -122,7 +138,7 @@ def refresh():
         for key, item in items.items()
     }
 
-    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}))
+    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"])
 
     return jsonify({
         "status": "ok",
@@ -135,12 +151,14 @@ def refresh():
 @app.route("/fetch2", methods=["POST"])
 def fetch2():
     if state["snapshot1_time"] is None:
-        return jsonify({"status": "error", "message": "No first snapshot — run Refresh first"}), 400
+        return jsonify({"status": "error", "message": "No first snapshot — run Refresh first", "error_type": "unknown"}), 400
 
     try:
         fetch_all()
+    except ApiError as e:
+        return jsonify({"status": "error", "message": str(e), "error_type": _api_error_type(e.status_code)}), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e), "error_type": "unknown"}), 200
 
     snapshot2_time = datetime.now()
     parsed = parse_all()
@@ -163,7 +181,7 @@ def fetch2():
                     region["liberation_time_hours"] = r_h2 / net_rate / 3600
 
     state["last_parsed"] = parsed
-    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}))
+    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"])
     discord_text = format_discord(parsed, state["classifications"], state["flavor"])
     video_text = format_video(parsed, state["classifications"], state["flavor"])
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
@@ -196,9 +214,12 @@ def save_classifications():
         return jsonify({"status": "error", "message": "Missing key or value"}), 400
     if value not in ("large", "small", "none"):
         return jsonify({"status": "error", "message": "Invalid tier value"}), 400
-    state["classifications"][key] = value
-    _save_classifications(state["classifications"])
-    return jsonify({"status": "ok"})
+    current = state["classifications"].get(key, "none")
+    if _TIER_PRIORITY.get(value, 0) >= _TIER_PRIORITY.get(current, 0):
+        state["classifications"][key] = value
+        _save_classifications(state["classifications"])
+    final_tier = state["classifications"].get(key, "none")
+    return jsonify({"status": "ok", "final_tier": final_tier})
 
 
 @app.route("/save_flavor", methods=["POST"])
@@ -228,6 +249,22 @@ def save_limit():
         state["flavor"]["limits"][faction] = True
     else:
         state["flavor"]["limits"].pop(faction, None)
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_tags", methods=["POST"])
+def save_tags():
+    data = request.get_json()
+    planet = data.get("planet")
+    tags = data.get("tags", [])
+    if not planet:
+        return jsonify({"status": "error", "message": "Missing planet"}), 400
+    state["flavor"].setdefault("planet_tags", {})
+    if tags:
+        state["flavor"]["planet_tags"][planet] = tags
+    else:
+        state["flavor"]["planet_tags"].pop(planet, None)
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
