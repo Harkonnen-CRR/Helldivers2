@@ -12,6 +12,7 @@ ENDPOINTS = [
     ("https://api.helldivers2.dev/api/v1/campaigns", "data/campaigns.json"),
     ("https://api.helldivers2.dev/api/v1/assignments", "data/assignments.json"),
     ("https://api.helldivers2.dev/api/v2/space-stations", "data/dss.json"),
+    ("https://api.helldivers2.dev/api/v1/war", "data/war.json"),
 ]
 
 for url, path in ENDPOINTS:
