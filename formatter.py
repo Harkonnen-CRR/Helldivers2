@@ -46,7 +46,7 @@ _THEATER_DISPLAY = {
     "Terminids": "TERMINID",
     "Automaton":  "AUTOMATON",
     "Illuminate": "ILLUMINATE",
-    "Humans":     "HUMAN",
+    "Humans":     "SUPER EARTH CONTROL",
 }
 
 _DSS_ITEM_MIX_MAP = {
@@ -495,6 +495,15 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
             lines.append(f">   • {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=True)}")
         lines.append("")
 
+    free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
+    if free_stratagems:
+        lines.append("**FLEETWIDE EQUIPMENT**")
+        for s in free_stratagems:
+            planets = s.get("planets") or []
+            planet_str = ", ".join(planets) if planets else "All active fronts"
+            lines.append(f"> **{s['name'].strip()}** — {planet_str}")
+        lines.append("")
+
     selected_ids = set(flavor_texts.get("selected_dispatches") or [])
     selected_dispatches = [d for d in (parsed_data.get("dispatches") or []) if d["id"] in selected_ids]
     if selected_dispatches:
@@ -679,6 +688,17 @@ def format_video(parsed_data, classifications, flavor_texts=None):
             lines.append(f"      - {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=False)}")
         lines.append("")
 
+    free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
+    if free_stratagems:
+        lines.append(MAJOR_SEP)
+        lines.append("FLEETWIDE EQUIPMENT")
+        lines.append(MAJOR_SEP)
+        for s in free_stratagems:
+            planets = s.get("planets") or []
+            planet_str = ", ".join(planets) if planets else "All active fronts"
+            lines.append(f"  {s['name'].strip()} — {planet_str}")
+        lines.append("")
+
     selected_ids = set(flavor_texts.get("selected_dispatches") or [])
     selected_dispatches = [d for d in (parsed_data.get("dispatches") or []) if d["id"] in selected_ids]
     if selected_dispatches:
@@ -704,7 +724,8 @@ def format_video(parsed_data, classifications, flavor_texts=None):
 
     for faction in theater_order:
         lines.append(MAJOR_SEP)
-        lines.append(f"{faction.upper()} FRONT")
+        display = _THEATER_DISPLAY.get(faction, faction.upper())
+        lines.append(f"{display} FRONT")
         lines.append(MAJOR_SEP)
         theater_text = theater_flavors.get(faction)
         if theater_text:
@@ -719,6 +740,11 @@ def format_video(parsed_data, classifications, flavor_texts=None):
             lines.append(MINOR_SEP)
             lines.append(f"{planet['name'].upper()}{dss_tag}")
             lines.append(MINOR_SEP)
+
+            planet_text = planet_flavors.get(planet["name"])
+            if planet_text:
+                lines.append(f"    {planet_text}")
+                lines.append("")
 
             progress_label = "Defense Progress" if is_def else "Liberation Progress"
 
@@ -770,11 +796,8 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                     pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
-                    lines.append(f"      {r['name']} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
+                    lines.append(f"      {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
 
-            planet_text = planet_flavors.get(planet["name"])
-            if planet_text:
-                lines.append(f"    {planet_text}")
             lines.append("")
 
     if dss:

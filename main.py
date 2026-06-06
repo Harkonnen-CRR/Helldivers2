@@ -63,6 +63,7 @@ def _load_flavor():
         data.setdefault("planet_modifiers", {})
         data.setdefault("custom_modifiers", [])
         data.setdefault("selected_dispatches", [])
+        data.setdefault("free_stratagems", [])
         data.setdefault("alert_titles", {
             "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
             "minor_order": "ALERT: MINOR ORDER UPDATE",
@@ -90,6 +91,7 @@ def _load_flavor():
         "theaters": {}, "planets": {}, "limits": {}, "planet_notes": {},
         "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
         "selected_dispatches": [],
+        "free_stratagems": [],
         "alert_titles": {
             "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
             "minor_order": "ALERT: MINOR ORDER UPDATE",
@@ -339,6 +341,26 @@ def save_faction_modifier():
         planet_mods.pop(key, None)
     if not planet_mods:
         state["flavor"]["planet_modifiers"].pop(planet, None)
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_free_stratagems", methods=["POST"])
+def save_free_stratagems():
+    data = request.get_json()
+    stratagems = data.get("stratagems", [])
+    state["flavor"]["free_stratagems"] = [
+        s for s in stratagems if isinstance(s, dict) and s.get("name", "").strip()
+    ]
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/reset_modifiers", methods=["POST"])
+def reset_modifiers():
+    """Clears all faction modifier selections and custom modifiers."""
+    state["flavor"]["planet_modifiers"] = {}
+    state["flavor"]["custom_modifiers"] = []
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 

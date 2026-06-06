@@ -132,6 +132,7 @@
     .theater-card.terminid  { border-color: #3a3000; }
     .theater-card.automaton { border-color: #3a1414; }
     .theater-card.illuminate{ border-color: #2a1a50; }
+    .theater-card.humans    { border-color: #003a5a; }
 
     .theater-card-header {
       background: #1a2a1a;
@@ -153,6 +154,8 @@
     .theater-card.automaton .theater-card-header:hover { background: #251010; }
     .theater-card.illuminate .theater-card-header { background: #120a20; color: #a070d8; }
     .theater-card.illuminate .theater-card-header:hover { background: #181028; }
+    .theater-card.humans .theater-card-header { background: #001a2a; color: #60c0f0; }
+    .theater-card.humans .theater-card-header:hover { background: #002035; }
     .theater-card-header .toggle-icon { color: #555; font-size: 11px; }
 
     .theater-card-body { display: none; padding: 14px; }
@@ -211,6 +214,7 @@
     .ref-planet.terminid  { background: #110e00; border-color: #2a2400; border-left-color: #6a5800; }
     .ref-planet.automaton { background: #110808; border-color: #2a1414; border-left-color: #6a2020; }
     .ref-planet.illuminate{ background: #0d0814; border-color: #1e1430; border-left-color: #5a3a90; }
+    .ref-planet.humans    { background: #001520; border-color: #003050; border-left-color: #0060a0; }
 
     .ref-planet-name {
       font-weight: bold;
@@ -222,12 +226,14 @@
     .ref-planet.terminid  .ref-planet-name { color: #e0cc80; }
     .ref-planet.automaton .ref-planet-name { color: #e09090; }
     .ref-planet.illuminate .ref-planet-name { color: #c0a0e8; }
+    .ref-planet.humans     .ref-planet-name { color: #60c0f0; }
     .ref-planet-name.is-mo { color: #f0c040 !important; }
 
     .ref-planet-stat { color: #7a9a7a; font-size: 11px; margin-bottom: 2px; }
     .ref-planet.terminid  .ref-planet-stat { color: #8a8050; }
     .ref-planet.automaton .ref-planet-stat { color: #8a6060; }
     .ref-planet.illuminate .ref-planet-stat { color: #7070a0; }
+    .ref-planet.humans     .ref-planet-stat { color: #4080a0; }
     .ref-planet-stat strong { color: #a0c0a0; }
     .ref-planet.terminid  .ref-planet-stat strong { color: #c0b060; }
     .ref-planet.automaton .ref-planet-stat strong { color: #c08080; }
@@ -269,22 +275,22 @@
     textarea.planet-notes-input {
       width: 100%;
       height: 60px;
-      background: #080f08;
-      border: 1px solid #1e3a1e;
+      background: #111;
+      border: 1px solid #2a2a2a;
       border-radius: 2px;
-      color: #80b080;
+      color: #b0b0b0;
       font-family: 'Courier New', monospace;
       font-size: 11px;
       padding: 5px 7px;
       resize: vertical;
     }
-    textarea.planet-notes-input:focus { outline: none; border-color: #3a6a3a; }
+    textarea.planet-notes-input:focus { outline: none; border-color: #444; }
 
     /* Planet flavor text list */
-    .planet-flavor-section { border-top: 1px solid #222; padding-top: 12px; }
-    .planet-flavor-label { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .planet-flavor-section { margin-top: 10px; border-top: 1px solid #1e1e1e; padding-top: 8px; }
+    .planet-flavor-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 
-    .planet-flavor-item { margin-bottom: 12px; }
+    .planet-flavor-item { margin-bottom: 6px; }
     .planet-subgroup-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; margin-bottom: 4px; }
     .planet-hazard-tiers { margin-left: 22px; }
     .planet-hazard-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
@@ -298,21 +304,22 @@
     .planet-modifier-param.visible { display: flex; align-items: center; gap: 4px; }
     .planet-modifier-param label { font-size: 10px; color: #666; }
     .planet-modifier-param select { background: #1a1a1a; border: 1px solid #333; color: #c0c0c0; font-size: 11px; padding: 1px 4px; border-radius: 2px; }
-    .planet-flavor-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .planet-flavor-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
     .planet-flavor-toggle input[type=checkbox] { accent-color: #80d080; cursor: pointer; }
-    .planet-flavor-toggle span { color: #c0c0c0; font-size: 12px; }
+    .planet-flavor-toggle span { color: #aaa; font-size: 11px; }
+    .planet-flavor-toggle:has(input:checked) span { color: #c8c8c8; }
     textarea.planet-flavor-text {
       display: none;
       width: 100%;
-      height: 60px;
-      margin-top: 6px;
-      background: #111;
+      height: 45px;
+      margin-top: 4px;
+      background: #0e0e0e;
       border: 1px solid #2a2a2a;
       border-radius: 3px;
       color: #c8c8c8;
       font-family: 'Courier New', monospace;
-      font-size: 12px;
-      padding: 6px 8px;
+      font-size: 11px;
+      padding: 4px 7px;
       resize: vertical;
     }
     textarea.planet-flavor-text:focus { outline: none; border-color: #444; }
@@ -417,8 +424,14 @@
     .faction-mod-row.illuminate .faction-mod-label { color: #9060c0; }
     .faction-mod-planet-checks { display: flex; gap: 10px; flex-wrap: wrap; }
     .faction-planet-check { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; color: #888; }
-    .faction-planet-check input[type=checkbox] { accent-color: #f08040; cursor: pointer; }
+    .faction-planet-check input[type=checkbox] { accent-color: #888; cursor: pointer; }
+    .faction-mod-row.terminid  .faction-planet-check input[type=checkbox] { accent-color: #c8a000; }
+    .faction-mod-row.automaton .faction-planet-check input[type=checkbox] { accent-color: #c84040; }
+    .faction-mod-row.illuminate .faction-planet-check input[type=checkbox] { accent-color: #9060c0; }
     .faction-planet-check:has(input:checked) { color: #f08040; }
+    .faction-mod-row.terminid  .faction-planet-check:has(input:checked) { color: #c8a000; }
+    .faction-mod-row.automaton .faction-planet-check:has(input:checked) { color: #c84040; }
+    .faction-mod-row.illuminate .faction-planet-check:has(input:checked) { color: #9060c0; }
     .faction-mod-params { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .faction-mod-param { display: none; align-items: center; gap: 4px; font-size: 10px; color: #666; }
     .faction-mod-param.visible { display: flex; }
@@ -458,6 +471,23 @@
       font-size: 11px; padding: 2px 8px; cursor: pointer; margin-top: 4px;
     }
     button.mod-add-btn:hover { background: #142014; }
+    button.mod-reset-btn {
+      background: #1a0f0f; color: #a06060; border: 1px solid #3a2020;
+      border-radius: 3px; font-family: 'Courier New', monospace;
+      font-size: 11px; padding: 2px 8px; cursor: pointer;
+    }
+    button.mod-reset-btn:hover { background: #251414; color: #c07070; }
+
+    /* Free Stratagems rows */
+    .strat-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
+    input.strat-name {
+      flex: 1; min-width: 200px;
+      background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace;
+      font-size: 12px; padding: 4px 7px;
+    }
+    input.strat-name:focus { outline: none; border-color: #444; }
+    input.strat-name::placeholder { color: #3a3a3a; }
 
     /* Alert titles section */
     .alert-title-row {
@@ -469,13 +499,13 @@
     select.alert-title-select {
       background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
       color: #c8c8c8; font-family: 'Courier New', monospace; font-size: 12px;
-      padding: 4px 6px; cursor: pointer; flex: 1; min-width: 240px;
+      padding: 4px 6px; cursor: pointer; width: auto;
     }
     select.alert-title-select:focus { outline: none; border-color: #444; }
     input.alert-title-custom {
       background: #111; border: 1px solid #3a3a00; border-radius: 3px;
       color: #f0c040; font-family: 'Courier New', monospace; font-size: 12px;
-      padding: 4px 7px; flex: 1; min-width: 240px;
+      padding: 4px 7px; flex: 1; min-width: 200px;
     }
     input.alert-title-custom:focus { outline: none; border-color: #666600; }
 
@@ -542,7 +572,10 @@
   <div class="section" id="modifiers-section">
     <div class="modifiers-header" onclick="toggleModifiersPanel()">
       <h3 style="margin:0">Gameplay Modifiers</h3>
-      <span class="toggle-icon" id="modifiers-toggle-icon">▲</span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <button class="mod-reset-btn" onclick="event.stopPropagation();resetAllModifiers()" title="Clear all faction modifiers and custom modifiers">↺ Reset</button>
+        <span class="toggle-icon" id="modifiers-toggle-icon">▲</span>
+      </span>
     </div>
     <div id="modifiers-body">
 
@@ -604,7 +637,7 @@
           <option value="PRIORITY ALERT: NEW MINOR ORDER">PRIORITY ALERT: NEW MINOR ORDER</option>
           <option value="ALERT: MINOR ORDER UPDATE">ALERT: MINOR ORDER UPDATE</option>
           <option value="ALERT: MINOR ORDER COMPLETE">ALERT: MINOR ORDER COMPLETE</option>
-          <option value="__pa_custom__">PRIORITY ALERT: Custom...</option>
+          <option value="ALERT: MINOR ORDER LOST">ALERT: MINOR ORDER LOST</option>
           <option value="__al_custom__">ALERT: Custom...</option>
         </select>
         <input type="text" class="alert-title-custom" data-section="minor_order" placeholder="type full title..." style="display:none">
@@ -613,14 +646,29 @@
       <div class="alert-title-row">
         <span class="alert-title-label">Strategic Opportunity</span>
         <select class="alert-title-select" data-section="strategic_opportunity" onchange="handleAlertSelect(this)">
-          <option value="ALERT: STRATEGIC OPPORTUNITY">ALERT: STRATEGIC OPPORTUNITY</option>
-          <option value="PRIORITY ALERT: STRATEGIC OPPORTUNITY IDENTIFIED">PRIORITY ALERT: STRATEGIC OPPORTUNITY IDENTIFIED</option>
-          <option value="__pa_custom__">PRIORITY ALERT: Custom...</option>
+          <option value="ALERT: STRATEGIC OPPORTUNITY IDENTIFIED">ALERT: STRATEGIC OPPORTUNITY IDENTIFIED</option>
+          <option value="ALERT: STRATEGIC OPPORTUNITY UPDATE">ALERT: STRATEGIC OPPORTUNITY UPDATE</option>
+          <option value="ALERT: STRATEGIC OPPORTUNITY SEIZED">ALERT: STRATEGIC OPPORTUNITY SEIZED</option>
+          <option value="ALERT: STRATEGIC OPPORTUNITY MISSED">ALERT: STRATEGIC OPPORTUNITY MISSED</option>
           <option value="__al_custom__">ALERT: Custom...</option>
         </select>
         <input type="text" class="alert-title-custom" data-section="strategic_opportunity" placeholder="type full title..." style="display:none">
       </div>
 
+    </div>
+  </div>
+
+  <!-- Free Stratagems Panel -->
+  <div class="section" id="strats-section">
+    <div class="modifiers-header" onclick="toggleSection('strats-body', 'strats-icon')">
+      <h3 style="margin:0">Fleetwide Equipment</h3>
+      <span class="toggle-icon" id="strats-icon">▲</span>
+    </div>
+    <div id="strats-body">
+      <div id="strat-list">
+        <div class="no-hazards" id="strat-empty">No fleetwide equipment — click + Add.</div>
+      </div>
+      <button class="mod-add-btn" onclick="addStratRow()" style="margin-top:6px">+ Add</button>
     </div>
   </div>
 
@@ -743,6 +791,7 @@
     updateClassificationPanel(data.items);
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildDispatchPanel(data.dispatches || [], data.flavor);
+    buildFreeStratagemsPanel(data.flavor);
     buildFlavorEditor(data.theaters, data.flavor);
     startCountdown();
   }
@@ -803,6 +852,7 @@
     document.getElementById('reformat-flavor-btn').style.display = 'inline-block';
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildDispatchPanel(data.dispatches || [], data.flavor);
+    buildFreeStratagemsPanel(data.flavor);
     buildFlavorEditor(data.theaters, data.flavor);
   }
 
@@ -1213,6 +1263,17 @@
     return row;
   }
 
+  async function resetAllModifiers() {
+    if (!confirm('Clear all faction modifiers and custom modifiers?')) return;
+    await fetch('/reset_modifiers', { method: 'POST' });
+    // Rebuild panel with empty state
+    const factionList = document.getElementById('faction-mod-list');
+    factionList.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = false; });
+    const customList = document.getElementById('custom-mod-list');
+    customList.innerHTML = '<div class="no-hazards" id="custom-mod-empty">No custom modifiers — click + Add.</div>';
+    scheduleReformat();
+  }
+
   function addCustomModRow() {
     const list = document.getElementById('custom-mod-list');
     const empty = document.getElementById('custom-mod-empty');
@@ -1240,6 +1301,83 @@
     scheduleReformat();
   }
 
+  // ── Free Stratagems ───────────────────────────────────────────
+
+  function buildFreeStratagemsPanel(flavor) {
+    const list = document.getElementById('strat-list');
+    list.innerHTML = '';
+    const saved = (flavor && flavor.free_stratagems) || [];
+    if (saved.length === 0) {
+      list.innerHTML = '<div class="no-hazards" id="strat-empty">No fleetwide equipment — click + Add.</div>';
+      return;
+    }
+    for (const s of saved) {
+      list.appendChild(buildStratRow(s.name || '', s.planets || []));
+    }
+  }
+
+  function buildStratRow(name, checkedPlanets) {
+    const row = document.createElement('div');
+    row.className = 'strat-row';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'strat-name';
+    nameInput.placeholder = 'Stratagem or equipment name...';
+    nameInput.value = name;
+    nameInput.addEventListener('input', saveAllStrats);
+
+    const planetsWrap = document.createElement('div');
+    planetsWrap.className = 'custom-mod-planets';
+    for (const pname of _activePlanetNames) {
+      const lbl = document.createElement('label');
+      lbl.className = 'custom-planet-check';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checkedPlanets.includes(pname);
+      cb.addEventListener('change', saveAllStrats);
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(pname));
+      planetsWrap.appendChild(lbl);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'custom-mod-del';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', () => { row.remove(); saveAllStrats(); });
+
+    row.appendChild(nameInput);
+    row.appendChild(planetsWrap);
+    row.appendChild(delBtn);
+    return row;
+  }
+
+  function addStratRow() {
+    const list = document.getElementById('strat-list');
+    const empty = document.getElementById('strat-empty');
+    if (empty) empty.remove();
+    const row = buildStratRow('', []);
+    list.appendChild(row);
+    row.querySelector('.strat-name').focus();
+  }
+
+  function saveAllStrats() {
+    const stratagems = [];
+    document.querySelectorAll('#strat-list .strat-row').forEach(row => {
+      const name = row.querySelector('.strat-name').value.trim();
+      const planets = [...row.querySelectorAll('.custom-planet-check input')]
+        .filter(cb => cb.checked)
+        .map(cb => cb.closest('.custom-planet-check').textContent.trim());
+      if (name) stratagems.push({ name, planets });
+    });
+    fetch('/save_free_stratagems', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stratagems }),
+    });
+    scheduleReformat();
+  }
+
   // ── Flavor editor ─────────────────────────────────────────────
 
   function buildFlavorEditor(theaters, flavor) {
@@ -1256,15 +1394,17 @@
     for (const theater of theaters) {
       const faction = theater.faction;
       const card = document.createElement('div');
-      const theaterFactionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate' }[faction] || '';
+      const theaterFactionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate', Humans: 'humans' }[faction] || '';
       card.className = 'theater-card' + (theaterFactionClass ? ' ' + theaterFactionClass : '');
 
       // Header (clickable to collapse)
+      const _JS_THEATER_DISPLAY = { Terminids: 'TERMINID', Automaton: 'AUTOMATON', Illuminate: 'ILLUMINATE', Humans: 'SUPER EARTH CONTROL' };
+      const theaterDisplayName = _JS_THEATER_DISPLAY[faction] || faction.toUpperCase();
       const isLimited = flavor && flavor.limits && flavor.limits[faction];
       const header = document.createElement('div');
       header.className = 'theater-card-header';
       header.innerHTML = `
-        <span>${faction.toUpperCase()} FRONT</span>
+        <span>${theaterDisplayName} FRONT</span>
         <span style="display:flex;align-items:center;gap:12px">
           <label onclick="event.stopPropagation()" style="font-size:11px;color:#888;font-weight:normal;cursor:pointer">
             <input type="checkbox" ${isLimited ? 'checked' : ''} onchange="saveLimit('${escHtml(faction)}', this.checked)" style="accent-color:#f0c040;cursor:pointer">
@@ -1299,11 +1439,7 @@
       refPanel.className = 'ref-panel';
       refPanel.innerHTML = buildRefPanelHTML(theater, flavor && flavor.planet_notes);
 
-      panels.appendChild(writePanel);
-      panels.appendChild(refPanel);
-      body.appendChild(panels);
-
-      // Planet flavor section
+      // Planet flavor section — lives inside the write panel, below the theater textarea
       const planetSection = document.createElement('div');
       planetSection.className = 'planet-flavor-section';
       planetSection.innerHTML = `<div class="planet-flavor-label">Planet Flavor Text</div>`;
@@ -1325,7 +1461,10 @@
         planetSection.appendChild(item);
       }
 
-      body.appendChild(planetSection);
+      writePanel.appendChild(planetSection);
+      panels.appendChild(writePanel);
+      panels.appendChild(refPanel);
+      body.appendChild(panels);
       card.appendChild(header);
       card.appendChild(body);
       container.appendChild(card);
@@ -1339,7 +1478,7 @@
 
   function buildRefPanelHTML(theater, planetNotes) {
     let html = '';
-    const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate' }[theater.faction] || '';
+    const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate', Humans: 'humans' }[theater.faction] || '';
 
     for (const p of theater.planets) {
       const moTag = p.is_mo ? ' is-mo' : '';
