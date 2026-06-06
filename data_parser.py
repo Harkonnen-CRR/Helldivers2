@@ -28,7 +28,7 @@ def _load(filename):
         raise ValueError(f"Malformed JSON in {path}: {e}")
 
 
-def _build_planet(planet, campaigns_by_index, exostorm):  # EXOSTORM — remove this block if mechanic is retired
+def _build_planet(planet, campaigns_by_index):
     stats = planet["statistics"]
     player_count = stats["playerCount"]
     health = planet["health"]
@@ -73,6 +73,7 @@ def _build_planet(planet, campaigns_by_index, exostorm):  # EXOSTORM — remove 
             "is_available": r.get("isAvailable", False),
             "players": r.get("players", 0),
             "liberation_time_hours": None,
+            "region_losing": False,
         })
 
     return {
@@ -88,12 +89,12 @@ def _build_planet(planet, campaigns_by_index, exostorm):  # EXOSTORM — remove 
         "progress_pct": progress_pct,
         "is_defense": is_defense,
         "contest_health": contest_health,
+        "contest_max_health": contest_max_health,
         "regen_per_second": planet["regenPerSecond"],
         "liberation_time_hours": None,
         "campaign_level": campaign["count"] if campaign else None,
         "campaign_type": campaign["type"] if campaign else None,
         "event": event,
-        "exostorm": exostorm if exostorm and planet["name"] == exostorm.get("planet") else None,  # EXOSTORM — remove this block if mechanic is retired
     }
 
 
@@ -156,7 +157,7 @@ def _build_dss(dss_data):
     }
 
 
-def parse_all(exostorm=None):  # EXOSTORM — remove this block if mechanic is retired
+def parse_all():
     planets_data = _load("planets.json")
     campaigns_data = _load("campaigns.json")
     assignments_data = _load("assignments.json")
@@ -168,14 +169,11 @@ def parse_all(exostorm=None):  # EXOSTORM — remove this block if mechanic is r
     campaigns_by_index = {c["planet"]["index"]: c for c in campaigns_data}
 
     top_planets = sorted(planets_data, key=lambda p: p["statistics"]["playerCount"], reverse=True)[:5]
-    planets = [_build_planet(p, campaigns_by_index, exostorm) for p in top_planets]  # EXOSTORM — remove this block if mechanic is retired
+    planets = [_build_planet(p, campaigns_by_index) for p in top_planets]
 
     return {
         "planets": planets,
         "major_order": _build_major_order(assignments_data),
         "dss": _build_dss(dss_data),
-        "meta": {
-            "impact_multiplier": impact_multiplier,
-            "exostorm_input": exostorm,  # EXOSTORM — remove this block if mechanic is retired
-        },
+        "meta": {"impact_multiplier": impact_multiplier},
     }

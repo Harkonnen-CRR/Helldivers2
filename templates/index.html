@@ -237,10 +237,15 @@
     .planet-hazard-tiers { margin-left: 22px; }
     .planet-hazard-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
     .planet-hazard-name { color: #888; font-size: 11px; min-width: 120px; }
-    .planet-variant-tags { margin-left: 22px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-    .planet-tag-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; color: #aaa; padding: 2px 6px; border: 1px solid #333; border-radius: 2px; }
-    .planet-tag-toggle input[type=checkbox] { accent-color: #f0c040; cursor: pointer; }
-    .planet-tag-toggle:has(input:checked) { color: #f0c040; border-color: #f0c040; background: #1a1600; }
+    .planet-modifiers { margin-left: 22px; margin-top: 4px; }
+    .planet-modifier-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .planet-modifier-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: #aaa; }
+    .planet-modifier-toggle input[type=checkbox] { accent-color: #f08040; cursor: pointer; }
+    .planet-modifier-toggle:has(input:checked) { color: #f08040; }
+    .planet-modifier-param { display: none; }
+    .planet-modifier-param.visible { display: flex; align-items: center; gap: 4px; }
+    .planet-modifier-param label { font-size: 10px; color: #666; }
+    .planet-modifier-param select { background: #1a1a1a; border: 1px solid #333; color: #c0c0c0; font-size: 11px; padding: 1px 4px; border-radius: 2px; }
     .planet-flavor-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
     .planet-flavor-toggle input[type=checkbox] { accent-color: #80d080; cursor: pointer; }
     .planet-flavor-toggle span { color: #c0c0c0; font-size: 12px; }
@@ -320,6 +325,36 @@
     .help-popup li { margin-left: 14px; }
 
     #status-msg { color: #d08080; font-size: 12px; }
+
+    .api-status { display: none; align-items: center; gap: 6px; }
+    .api-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .api-dot-label { font-size: 10px; letter-spacing: 1px; }
+    .api-status.down  .api-dot { background: #ff4040; animation: api-pulse 1.5s ease-in-out infinite; }
+    .api-status.down  .api-dot-label { color: #ff4040; }
+    .api-status.up    .api-dot { background: #40c060; }
+    .api-status.up    .api-dot-label { color: #40c060; }
+    .api-status.checking .api-dot { background: #f0c040; animation: api-pulse 0.7s ease-in-out infinite; }
+    .api-status.checking .api-dot-label { color: #f0c040; }
+    @keyframes api-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+    .options-wrapper { position: relative; }
+    .options-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 340px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 14px;
+      z-index: 200;
+      max-height: 70vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+    .options-dropdown.open { display: block; }
+    .options-section-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -333,34 +368,35 @@
     <button id="cancel-btn" class="cancel" onclick="cancelRefresh()" style="display:none">✕ CANCEL</button>
     <button id="reformat-btn" class="secondary" onclick="reformat()" style="display:none">↺ REFRESH TEXT</button>
     <span id="status-msg"></span>
-  </div>
-
-  <!-- Classification panel (collapsed by default — per-planet controls are in the flavor editor) -->
-  <div class="section" id="classifications-section">
-    <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleClassificationsPanel()">
-      <h3 style="margin:0">Hazard Classifications</h3>
-      <span style="color:#555;font-size:11px">(per-planet — expand for global view)</span>
-      <span id="class-toggle-icon" style="color:#555;margin-left:auto">▼ Show</span>
-    </div>
-    <div id="hazard-list" style="display:none;margin-top:10px">
-      {% if classifications %}
-        {% for key, tier in classifications.items() %}
-          {% if key.startswith('hazard_') %}
-            {% set name = key[7:] %}
-            <div class="hazard-item" data-key="{{ key }}">
-              <div class="hazard-name">{{ name }}</div>
-              <div class="tier-radios">
-                <label class="tier-large"><input type="radio" name="{{ key }}" value="large" {% if tier == 'large' %}checked{% endif %} onchange="saveTier('{{ key }}', 'large')"> Large</label>
-                <label class="tier-small"><input type="radio" name="{{ key }}" value="small" {% if tier == 'small' %}checked{% endif %} onchange="saveTier('{{ key }}', 'small')"> Small</label>
-                <label class="tier-none"> <input type="radio" name="{{ key }}" value="none"  {% if tier == 'none'  %}checked{% endif %} onchange="saveTier('{{ key }}', 'none')">  None</label>
-              </div>
-              <div class="hazard-desc"></div>
-            </div>
+    <span class="api-status" id="api-status">
+      <span class="api-dot"></span>
+      <span class="api-dot-label" id="api-dot-label"></span>
+    </span>
+    <div class="options-wrapper" id="options-wrapper">
+      <button class="secondary" onclick="toggleOptionsMenu(event)">⚙ OPTIONS</button>
+      <div class="options-dropdown" id="options-dropdown">
+        <div class="options-section-label">Hazard Classifications</div>
+        <div id="hazard-list">
+          {% if classifications %}
+            {% for key, tier in classifications.items() %}
+              {% if key.startswith('hazard_') %}
+                {% set name = key[7:] %}
+                <div class="hazard-item" data-key="{{ key }}">
+                  <div class="hazard-name">{{ name }}</div>
+                  <div class="tier-radios">
+                    <label class="tier-large"><input type="radio" name="{{ key }}" value="large" {% if tier == 'large' %}checked{% endif %} onchange="saveTier('{{ key }}', 'large')"> Large</label>
+                    <label class="tier-small"><input type="radio" name="{{ key }}" value="small" {% if tier == 'small' %}checked{% endif %} onchange="saveTier('{{ key }}', 'small')"> Small</label>
+                    <label class="tier-none"> <input type="radio" name="{{ key }}" value="none"  {% if tier == 'none'  %}checked{% endif %} onchange="saveTier('{{ key }}', 'none')">  None</label>
+                  </div>
+                  <div class="hazard-desc"></div>
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <div class="no-hazards">No hazards classified yet — hit Refresh to load current data.</div>
           {% endif %}
-        {% endfor %}
-      {% else %}
-        <div class="no-hazards">No hazards classified yet — hit Refresh to load current data.</div>
-      {% endif %}
+        </div>
+      </div>
     </div>
   </div>
 
@@ -460,15 +496,19 @@
     } catch (e) {
       setStatus('⚠ Cannot reach the local server — is Flask running?');
       document.getElementById('refresh-btn').disabled = false;
+      startApiPolling();
       return;
     }
 
     if (data.status !== 'ok') {
       setStatus(apiErrorMessage(data) + ' — click Run Calculations to retry.');
       document.getElementById('refresh-btn').disabled = false;
+      startApiPolling();
       return;
     }
 
+    stopApiPolling();
+    hideApiDot();
     updateClassificationPanel(data.items);
     buildFlavorEditor(data.theaters, data.flavor);
     startCountdown();
@@ -507,6 +547,7 @@
     } catch (e) {
       setStatus('⚠ Cannot reach the local server — is Flask running?');
       resetAfterFetch();
+      startApiPolling();
       return;
     }
 
@@ -514,8 +555,12 @@
 
     if (data.status !== 'ok') {
       setStatus(apiErrorMessage(data) + ' — second fetch failed, liberation rates unavailable.');
+      startApiPolling();
       return;
     }
+
+    stopApiPolling();
+    hideApiDot();
 
     setStatus('');
     document.getElementById('out-discord').value = data.discord;
@@ -626,28 +671,98 @@
     }, 1000);
   }
 
-  function toggleClassificationsPanel() {
-    const list = document.getElementById('hazard-list');
-    const icon = document.getElementById('class-toggle-icon');
-    const shown = list.style.display !== 'none';
-    list.style.display = shown ? 'none' : '';
-    icon.textContent = shown ? '▼ Show' : '▲ Hide';
+  // ── API status polling ────────────────────────────────────────
+
+  let _pollInterval = null;
+
+  function setApiDot(state, label) {
+    const container = document.getElementById('api-status');
+    container.className = 'api-status ' + state;
+    container.style.display = 'flex';
+    document.getElementById('api-dot-label').textContent = label;
   }
 
-  async function saveTags(planetName, tags) {
-    await fetch('/save_tags', {
+  function hideApiDot() {
+    document.getElementById('api-status').style.display = 'none';
+  }
+
+  function startApiPolling() {
+    if (_pollInterval) return;
+    setApiDot('down', 'API DOWN');
+    _pollInterval = setInterval(checkApiStatus, 30000);
+  }
+
+  function stopApiPolling() {
+    clearInterval(_pollInterval);
+    _pollInterval = null;
+  }
+
+  async function checkApiStatus() {
+    setApiDot('checking', 'CHECKING...');
+    try {
+      const res = await fetch('/ping', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        stopApiPolling();
+        setApiDot('up', 'API ONLINE');
+        setStatus('✓ API is back online — click Run Calculations to fetch fresh data.');
+        document.getElementById('status-msg').style.color = '#40c060';
+      } else {
+        setApiDot('down', 'API DOWN');
+      }
+    } catch (e) {
+      setApiDot('down', 'API DOWN');
+    }
+  }
+
+  function toggleOptionsMenu(e) {
+    e.stopPropagation();
+    document.getElementById('options-dropdown').classList.toggle('open');
+  }
+
+  document.addEventListener('click', function(e) {
+    const wrapper = document.getElementById('options-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      document.getElementById('options-dropdown').classList.remove('open');
+    }
+  });
+
+  function _collectModifiers(planetItem) {
+    const modifiers = {};
+    planetItem.querySelectorAll('.planet-modifier-toggle input[type=checkbox]').forEach(cb => {
+      if (!cb.checked) return;
+      const key = cb.dataset.mod;
+      const params = {};
+      planetItem.querySelectorAll(`.planet-modifier-param[data-mod="${key}"]`).forEach(p => {
+        const sel = p.querySelector('select');
+        if (sel) params[p.dataset.param] = sel.value;
+      });
+      modifiers[key] = params;
+    });
+    return modifiers;
+  }
+
+  async function saveModifiers(planetName, modifiers) {
+    await fetch('/save_modifiers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planet: planetName, tags }),
+      body: JSON.stringify({ planet: planetName, modifiers }),
     });
     scheduleReformat();
   }
 
-  function handleTagChange(planetName, checkbox) {
-    const item = checkbox.closest('.planet-flavor-item');
-    const allBoxes = item.querySelectorAll('.planet-variant-tags input[type=checkbox]');
-    const activeTags = Array.from(allBoxes).filter(cb => cb.checked).map(cb => cb.dataset.tag);
-    saveTags(planetName, activeTags);
+  function handleModifierToggle(planetName, modKey, checked) {
+    const item = event.target.closest('.planet-flavor-item');
+    // Show/hide param controls for this modifier
+    item.querySelectorAll(`.planet-modifier-param[data-mod="${modKey}"]`).forEach(p => {
+      p.classList.toggle('visible', checked);
+    });
+    saveModifiers(planetName, _collectModifiers(item));
+  }
+
+  function handleModifierParam(planetName, modKey, paramKey, value) {
+    const item = event.target.closest('.planet-flavor-item');
+    saveModifiers(planetName, _collectModifiers(item));
   }
 
   // ── Flavor editor ─────────────────────────────────────────────
@@ -717,12 +832,9 @@
       planetSection.className = 'planet-flavor-section';
       planetSection.innerHTML = `<div class="planet-flavor-label">Planet Flavor Text</div>`;
 
-      const planetTags = (flavor && flavor.planet_tags) ? flavor.planet_tags : {};
-
       for (const planet of theater.planets) {
         const saved = planetFlavors[planet.name] || '';
         const hasText = saved.length > 0;
-        const activeTags = planetTags[planet.name] || [];
 
         // Hazard tier section
         let hazardTierHTML = '';
@@ -742,18 +854,33 @@
           hazardTierHTML += '</div>';
         }
 
-        // Variant tags section
-        let tagsHTML = '';
-        if (planet.variant_tags && planet.variant_tags.length > 0) {
-          tagsHTML = `<div class="planet-variant-tags"><div class="planet-subgroup-label" style="width:100%">Active Variants</div>`;
-          for (const tag of planet.variant_tags) {
-            const checked = activeTags.includes(tag) ? 'checked' : '';
-            tagsHTML += `<label class="planet-tag-toggle">
-              <input type="checkbox" data-tag="${escHtml(tag)}" ${checked} onchange="handleTagChange('${escHtml(planet.name)}', this)">
-              ${escHtml(tag)}
-            </label>`;
+        // Mission Modifiers section
+        let modifiersHTML = '';
+        if (planet.modifier_options && planet.modifier_options.length > 0) {
+          const activeMods = planet.active_modifiers || {};
+          modifiersHTML = `<div class="planet-modifiers"><div class="planet-subgroup-label">Mission Modifiers</div>`;
+          for (const mod of planet.modifier_options) {
+            const isActive = mod.key in activeMods;
+            const paramVals = activeMods[mod.key] || {};
+            let paramsHTML = '';
+            for (const param of (mod.params || [])) {
+              const currentVal = paramVals[param.key] || param.options[0];
+              const opts = param.options.map(o => `<option value="${escHtml(o)}" ${currentVal === o ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+              paramsHTML += `<span class="planet-modifier-param ${isActive ? 'visible' : ''}" data-mod="${escHtml(mod.key)}" data-param="${escHtml(param.key)}">
+                <label>${escHtml(param.label)}:</label>
+                <select onchange="handleModifierParam('${escHtml(planet.name)}', '${escHtml(mod.key)}', '${escHtml(param.key)}', this.value)">${opts}</select>
+              </span>`;
+            }
+            modifiersHTML += `<div class="planet-modifier-row">
+              <label class="planet-modifier-toggle">
+                <input type="checkbox" data-mod="${escHtml(mod.key)}" ${isActive ? 'checked' : ''}
+                  onchange="handleModifierToggle('${escHtml(planet.name)}', '${escHtml(mod.key)}', this.checked)">
+                ${escHtml(mod.label)}
+              </label>
+              ${paramsHTML}
+            </div>`;
           }
-          tagsHTML += '</div>';
+          modifiersHTML += '</div>';
         }
 
         const item = document.createElement('div');
@@ -766,7 +893,7 @@
           <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
             data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
           ${hazardTierHTML}
-          ${tagsHTML}
+          ${modifiersHTML}
         `;
         planetSection.appendChild(item);
       }

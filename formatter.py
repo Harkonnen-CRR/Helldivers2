@@ -48,10 +48,28 @@ _DSS_ITEM_MIX_MAP = {
     3992382197: "Common Samples",
 }
 
-_FACTION_VARIANT_TAGS = {
-    "Terminids": ["Predator Strain", "Spore Spewer", "Shriekers"],
-    "Automaton": ["Jet Brigade"],
-    "Illuminate": ["Appropriators"],
+_FACTION_MODIFIERS = {
+    "Terminids": [
+        {"key": "predator_strain",   "label": "Predator Strain",   "output": "Predator Strain — rapid and stealthy Terminid variants on-planet",          "params": []},
+        {"key": "spore_burst_strain","label": "Spore Burst Strain","output": "Spore Burst Strain — explosive-death Terminid variants present",             "params": []},
+        {"key": "rupture_strain",    "label": "Rupture Strain",    "output": "Rupture Strain — burrowing Terminid variants confirmed",                     "params": []},
+        {"key": "hive_lords",        "label": "Hive Lords Present","output": "Hive Lords confirmed on-planet",                                             "params": []},
+        {"key": "dragonroaches",     "label": "Dragonroaches Active","output": "Dragonroach presence confirmed on-planet",                                  "params": []},
+    ],
+    "Automaton": [
+        {"key": "jet_brigade",       "label": "Jet Brigade",       "output": "Jet Brigade — jetpack-equipped Automaton units active",                      "params": []},
+        {"key": "incineration_corps","label": "Incineration Corps","output": "Incineration Corps — flame-based Automaton variants active",                  "params": []},
+        {"key": "cyborg_legion",     "label": "Cyborg Legion",     "output": "Cyborg Legion — cybernetically enhanced human fighters present",              "params": []},
+        {"key": "hulk_surge",        "label": "Hulk Surge",        "output": "Hulk Surge — increased Hulk-class activity",                                 "params": []},
+        {"key": "devastator_surge",  "label": "Devastator Surge",  "output": "Devastator Surge — increased Devastator activity",                           "params": []},
+    ],
+    "Illuminate": [
+        {"key": "appropriators",     "label": "Appropriators",     "output": "Appropriators — piloted walker units and drone variants active",              "params": []},
+        {"key": "mindless_masses",   "label": "Mindless Masses",   "output": "Mindless Masses — increased Voteless and Fleshmob spawn rates",              "params": []},
+        {"key": "exostorm",          "label": "Exostorm Active",   "output": "Exostorm — Class {class}", "params": [
+            {"key": "class", "type": "select", "options": ["1", "2", "3"], "label": "Class"}
+        ]},
+    ],
 }
 
 
@@ -146,12 +164,35 @@ def _format_defense_time(planet):
     return (None, f"Planet Defended in {format_duration(lib_time)}")
 
 
+def _defense_header(planet):
+    """Short outcome string for the planet name header on defense planets."""
+    lib_time = planet.get("liberation_time_hours")
+    event = planet.get("event") or {}
+    event_remaining = _time_remaining_hours(event.get("end_time"))
+    if lib_time is None:
+        return "Establishing a Beachhead"
+    if event_remaining is not None and lib_time > event_remaining:
+        return f"LOST in {format_duration(event_remaining)}"
+    return f"DEFENDED in {format_duration(lib_time)}"
+
+
 def _format_region_status(region):
-    """Status string for a region.
-    Secure only when 0% cleared AND no active players — otherwise lib time or beachhead."""
-    if not region.get("progress_pct") and not region.get("players", 0):
+    if not region.get("players", 0):
         return "Secure"
-    return _format_lib_time(region.get("liberation_time_hours"))
+    health = region.get("health", 0)
+    max_health = region.get("max_health", 0)
+    pct = (1 - health / max_health) * 100 if max_health else 0.0
+    if pct < 0.1:
+        return "Performing recon..."
+    if pct <= 3.0:
+        return "Establishing a Beachhead"
+    lib_time = region.get("liberation_time_hours")
+    if lib_time is None:
+        return "Calculating..."
+    duration = format_duration(lib_time)
+    if region.get("region_losing"):
+        return f"Region Lost in: {duration}"
+    return f"Region Secured in: {duration}"
 
 
 # FUTURE: replace with classify_items_web() for web UI, same input/output shape
@@ -423,69 +464,88 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
         for planet in theaters[faction]:
             is_def = planet["is_defense"]
             on_dss = planet["index"] == dss_planet_index
-            dss_tag = " *(DSS in orbit)*" if on_dss else ""
-            lines.append(f"**{planet['name']}**{dss_tag}")
 
-            progress_label = "Defense Progress" if is_def else "Liberation Progress"
-
-            lines.append(f"> **Sector:** {planet['sector']} | **Biome:** {planet['biome']}")
-            campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")
-            lines.append(f"> **Campaign Level:** {planet['campaign_level']} | **Type:** {campaign_type_label}")
-            lines.append(f"> **Players:** {planet['player_count']:,}")
-            lines.append(f"> **{progress_label}:** {planet['progress_pct']}%")
             if is_def:
-                d_label, d_time = _format_defense_time(planet)
-                if d_label:
-                    lines.append(f"> **{d_label}:** {d_time}")
-                else:
-                    lines.append(f"> {d_time}")
+                outcome = _defense_header(planet)
             else:
-                lib_str = _format_lib_time(planet["liberation_time_hours"])
-                if planet["liberation_time_hours"] is not None:
-                    lines.append(f"> **Time to Liberation:** {lib_str}")
-                else:
-                    lines.append(f"> {lib_str}")
-            lines.append(f"> **Regen/sec:** {planet['regen_per_second']:.2f}")
+                lib_time = planet.get("liberation_time_hours")
+                outcome = f"Liberation in {format_duration(lib_time)}" if lib_time is not None else "Establishing a Beachhead"
+            lines.append(f"**{planet['name']}: {outcome}**")
+
+            planet_text = planet_flavors.get(planet["name"])
+            if planet_text:
+                lines.append(f"*{planet_text}*")
+            lines.append("")
+
+            planet_mods = (flavor_texts.get("planet_modifiers") or {}).get(planet["name"], {})
+            enemy_faction = _enemy_faction(planet)
+
+            if is_def:
+                count_label = "Invasion Level"
+            elif planet_mods.get("exostorm"):
+                count_label = "Campaign Level"
+            else:
+                count_label = "Enemy Resistance"
+
+            lines.append("__**Planetary Details and Modifiers**__")
+
+            if on_dss and dss:
+                lines.append("> **DSS in Orbit**")
+                for action in dss["tactical_actions"]:
+                    if action["status_label"] == "active":
+                        expire = action.get("status_expire")
+                        duration_str = ""
+                        if expire:
+                            hrs = _time_remaining_hours(expire)
+                            if hrs and hrs > 0:
+                                duration_str = f" — Active for {format_duration(hrs)}"
+                        lines.append(f"> **{action['name']}**{duration_str}")
+                        desc = _strip_html(action["strategic_description"])
+                        if desc:
+                            lines.append(f"> │ *{desc}*")
+
+            lines.append(f"> Sector: {planet['sector']} | Biome: **{planet['biome']}**")
+            hp_max = planet.get("contest_max_health", 0)
+            if hp_max:
+                lines.append(f"> Current HP: {int(planet['contest_health']):,}/{int(hp_max):,}")
+            lines.append(f"> Players: {planet['player_count']:,}")
+            if count_label == "Enemy Resistance":
+                pct = planet.get("progress_pct")
+                if pct is not None:
+                    lines.append(f"> **Enemy Resistance: {pct}%**")
+            elif planet.get("campaign_level") is not None:
+                lines.append(f"> **{count_label}: {planet['campaign_level']}**")
+            for mod in _FACTION_MODIFIERS.get(enemy_faction, []):
+                if mod["key"] in planet_mods:
+                    params = planet_mods[mod["key"]]
+                    try:
+                        output = mod["output"].format(**params) if params else mod["output"]
+                    except KeyError:
+                        output = mod["output"]
+                    lines.append(f"> **{output}**")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
-            if hazards:
-                lines.append("> **Hazards:**")
-                for hazard in hazards:
-                    lines.append(f"> {_format_hazard_discord(hazard, classifications)}")
+            for hazard in hazards:
+                lines.append(f"> {_format_hazard_discord(hazard, classifications)}")
 
-            active_tags = (flavor_texts.get("planet_tags") or {}).get(planet["name"], [])
-            if active_tags:
-                tag_label = "Active Variants" if len(active_tags) > 1 else "Active Variant"
-                lines.append(f"> **⚠ {tag_label}:** {', '.join(active_tags)}")
-
-            active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0]
+            active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
-                lines.append("> **Population Centers:**")
+                lines.append("")
+                lines.append("__**Population Centers:**__")
                 for r in active_regions:
                     pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
-                    lines.append(f"> - **{r['name']}** ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
+                    status_str = f"**{status}**" if ("Secured in" in status or "Lost in" in status) else status
+                    lines.append(f"> {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared | {status_str}")
 
-            # EXOSTORM — remove this block if mechanic is retired
-            if planet.get("exostorm"):
-                ex = planet["exostorm"]
-                lines.append(f"> **Exostorm** — *[MANUAL INPUT]* Class: {ex['class']}")
-
-            planet_text = planet_flavors.get(planet["name"])
-            if planet_text:
-                lines.append(f"> *{planet_text}*")
             lines.append("")
 
     if dss:
         lines.append("")
         lines.extend(_format_dss_discord(dss))
 
-    text = "\n".join(lines)
-    used = len(text)
-    remaining = 4000 - used
-    text += f"\n*{used} characters used | {remaining} remaining for flavor text*"
-    return text
+    return "\n".join(lines)
 
 
 def format_video(parsed_data, classifications, flavor_texts=None):
@@ -556,6 +616,17 @@ def format_video(parsed_data, classifications, flavor_texts=None):
 
             progress_label = "Defense Progress" if is_def else "Liberation Progress"
 
+            planet_mods = (flavor_texts.get("planet_modifiers") or {}).get(planet["name"], {})
+            enemy_faction = _enemy_faction(planet)
+            for mod in _FACTION_MODIFIERS.get(enemy_faction, []):
+                if mod["key"] in planet_mods:
+                    params = planet_mods[mod["key"]]
+                    try:
+                        output = mod["output"].format(**params) if params else mod["output"]
+                    except KeyError:
+                        output = mod["output"]
+                    lines.append(f"    {output}")
+
             lines.append(f"    Sector: {planet['sector']} | Biome: {planet['biome']}")
             campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")
             lines.append(f"    Campaign Level: {planet['campaign_level']} | Type: {campaign_type_label}")
@@ -581,12 +652,7 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 for hazard in hazards:
                     lines.append(f"      {_format_hazard_video(hazard, classifications)}")
 
-            active_tags = (flavor_texts.get("planet_tags") or {}).get(planet["name"], [])
-            if active_tags:
-                tag_label = "Active Variants" if len(active_tags) > 1 else "Active Variant"
-                lines.append(f"    {tag_label}: {', '.join(active_tags)}")
-
-            active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0]
+            active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
                 lines.append("    Population Centers:")
                 for r in active_regions:
@@ -594,11 +660,6 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
                     lines.append(f"      {r['name']} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
-
-            # EXOSTORM — remove this block if mechanic is retired
-            if planet.get("exostorm"):
-                ex = planet["exostorm"]
-                lines.append(f"      EXOSTORM [MANUAL INPUT] — Class: {ex['class']}")
 
             planet_text = planet_flavors.get(planet["name"])
             if planet_text:
@@ -629,7 +690,7 @@ def _dss_action_timing(action):
     return None
 
 
-def get_theater_data(parsed_data, limits=None, classifications=None):
+def get_theater_data(parsed_data, limits=None, classifications=None, planet_modifiers=None):
     """Returns structured theater data for the flavor editor reference panels.
 
     Pre-formats all durations and task labels so the JS template has no calculation to do.
@@ -637,6 +698,7 @@ def get_theater_data(parsed_data, limits=None, classifications=None):
     """
     limits = limits or {}
     classifications = classifications or {}
+    planet_modifiers = planet_modifiers or {}
     theater_order, theaters = _build_theaters(parsed_data)
     for faction in theater_order:
         if limits.get(faction):
@@ -668,7 +730,7 @@ def get_theater_data(parsed_data, limits=None, classifications=None):
                 for h in p.get("hazards", []) if h.get("name") and h["name"] != "None"
             ]
             enemy_faction = _enemy_faction(p)
-            variant_tags = _FACTION_VARIANT_TAGS.get(enemy_faction, [])
+            modifier_options = _FACTION_MODIFIERS.get(enemy_faction, [])
             if p["is_defense"]:
                 d_label, d_time = _format_defense_time(p)
                 time_status = f"{d_label}: {d_time}" if d_label else d_time
@@ -697,7 +759,8 @@ def get_theater_data(parsed_data, limits=None, classifications=None):
                 "biome_description": p.get("biome_description", ""),
                 "hazards": hazards,
                 "regions": regions,
-                "variant_tags": variant_tags,
+                "modifier_options": modifier_options,
+                "active_modifiers": planet_modifiers.get(p["name"], {}),
             })
 
         mo_ref = None

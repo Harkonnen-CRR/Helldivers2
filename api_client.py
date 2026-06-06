@@ -24,12 +24,12 @@ class ApiError(Exception):
         self.status_code = status_code
 
 
-def _fetch_with_retry(url):
+def _fetch_with_retry(url, timeout=TIMEOUT):
     for _ in range(3):
         try:
-            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            response = requests.get(url, headers=HEADERS, timeout=timeout)
         except requests.exceptions.Timeout:
-            raise ApiError(f"Request timed out after {TIMEOUT}s", status_code=None)
+            raise ApiError(f"Request timed out after {timeout}s", status_code=None)
         except requests.exceptions.ConnectionError:
             raise ApiError("Cannot reach helldivers2.dev — check your connection", status_code=None)
 
@@ -44,6 +44,11 @@ def _fetch_with_retry(url):
         return response
 
     raise ApiError("Still rate-limited after 3 retries", status_code=429)
+
+
+def ping():
+    """Lightweight connectivity check — fetches only the war endpoint."""
+    _fetch_with_retry("https://api.helldivers2.dev/api/v1/war", timeout=5)
 
 
 def fetch_all():

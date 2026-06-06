@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
 
-from api_client import fetch_all, ApiError
+from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all
 from formatter import format_discord, format_video, get_theater_data
 
@@ -50,8 +50,6 @@ def _save_classifications(classifications):
         json.dump(classifications, f, indent=2)
 
 
-_TIER_PRIORITY = {"large": 2, "small": 1, "none": 0}
-
 
 def _load_flavor():
     if os.path.exists(FLAVOR_PATH):
@@ -62,8 +60,9 @@ def _load_flavor():
         data.setdefault("limits", {})
         data.setdefault("planet_notes", {})
         data.setdefault("planet_tags", {})
+        data.setdefault("planet_modifiers", {})
         return data
-    return {"theaters": {}, "planets": {}, "limits": {}, "planet_notes": {}, "planet_tags": {}}
+    return {"theaters": {}, "planets": {}, "limits": {}, "planet_notes": {}, "planet_tags": {}, "planet_modifiers": {}}
 
 
 def _save_flavor(flavor):
@@ -138,7 +137,7 @@ def refresh():
         for key, item in items.items()
     }
 
-    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"])
+    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"], state["flavor"].get("planet_modifiers", {}))
 
     return jsonify({
         "status": "ok",
@@ -176,12 +175,21 @@ def fetch2():
                 rkey = f"{idx}_r{region['id']}"
                 r_h1 = state["snapshot1_health"].get(rkey)
                 r_h2 = region["health"]
-                if r_h1 is not None and r_h1 > r_h2 > 0:
+                if r_h1 is None:
+                    continue
+                if r_h1 > r_h2 > 0:
                     net_rate = (r_h1 - r_h2) / elapsed
                     region["liberation_time_hours"] = r_h2 / net_rate / 3600
+                elif r_h2 > r_h1:
+                    net_rate = (r_h2 - r_h1) / elapsed
+                    max_h = region.get("max_health", 0)
+                    remaining = max_h - r_h2
+                    if net_rate > 0 and remaining > 0:
+                        region["liberation_time_hours"] = remaining / net_rate / 3600
+                        region["region_losing"] = True
 
     state["last_parsed"] = parsed
-    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"])
+    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"], state["flavor"].get("planet_modifiers", {}))
     discord_text = format_discord(parsed, state["classifications"], state["flavor"])
     video_text = format_video(parsed, state["classifications"], state["flavor"])
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
@@ -214,12 +222,9 @@ def save_classifications():
         return jsonify({"status": "error", "message": "Missing key or value"}), 400
     if value not in ("large", "small", "none"):
         return jsonify({"status": "error", "message": "Invalid tier value"}), 400
-    current = state["classifications"].get(key, "none")
-    if _TIER_PRIORITY.get(value, 0) >= _TIER_PRIORITY.get(current, 0):
-        state["classifications"][key] = value
-        _save_classifications(state["classifications"])
-    final_tier = state["classifications"].get(key, "none")
-    return jsonify({"status": "ok", "final_tier": final_tier})
+    state["classifications"][key] = value
+    _save_classifications(state["classifications"])
+    return jsonify({"status": "ok", "final_tier": value})
 
 
 @app.route("/save_flavor", methods=["POST"])
@@ -253,18 +258,27 @@ def save_limit():
     return jsonify({"status": "ok"})
 
 
-@app.route("/save_tags", methods=["POST"])
-def save_tags():
+@app.route("/ping", methods=["POST"])
+def api_ping():
+    try:
+        ping()
+    except ApiError as e:
+        return jsonify({"status": "error", "error_type": _api_error_type(e.status_code)})
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_modifiers", methods=["POST"])
+def save_modifiers():
     data = request.get_json()
     planet = data.get("planet")
-    tags = data.get("tags", [])
+    modifiers = data.get("modifiers", {})
     if not planet:
         return jsonify({"status": "error", "message": "Missing planet"}), 400
-    state["flavor"].setdefault("planet_tags", {})
-    if tags:
-        state["flavor"]["planet_tags"][planet] = tags
+    state["flavor"].setdefault("planet_modifiers", {})
+    if modifiers:
+        state["flavor"]["planet_modifiers"][planet] = modifiers
     else:
-        state["flavor"]["planet_tags"].pop(planet, None)
+        state["flavor"]["planet_modifiers"].pop(planet, None)
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
