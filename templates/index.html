@@ -129,6 +129,9 @@
       margin-bottom: 16px;
       overflow: hidden;
     }
+    .theater-card.terminid  { border-color: #3a3000; }
+    .theater-card.automaton { border-color: #3a1414; }
+    .theater-card.illuminate{ border-color: #2a1a50; }
 
     .theater-card-header {
       background: #1a2a1a;
@@ -144,6 +147,12 @@
       user-select: none;
     }
     .theater-card-header:hover { background: #1e2e1e; }
+    .theater-card.terminid  .theater-card-header { background: #1e1a00; color: #c8b040; }
+    .theater-card.terminid  .theater-card-header:hover { background: #252000; }
+    .theater-card.automaton .theater-card-header { background: #1e0a0a; color: #c86060; }
+    .theater-card.automaton .theater-card-header:hover { background: #251010; }
+    .theater-card.illuminate .theater-card-header { background: #120a20; color: #a070d8; }
+    .theater-card.illuminate .theater-card-header:hover { background: #181028; }
     .theater-card-header .toggle-icon { color: #555; font-size: 11px; }
 
     .theater-card-body { display: none; padding: 14px; }
@@ -181,22 +190,53 @@
     textarea.flavor-textarea:focus { outline: none; border-color: #444; }
 
     .ref-panel {
-      background: #0f0f0f;
-      border: 1px solid #222;
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
       border-radius: 3px;
-      padding: 10px;
+      padding: 8px;
       font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .ref-planet {
-      border-bottom: 1px solid #1e1e1e;
-      padding: 6px 0;
+      background: #0c100c;
+      border: 1px solid #1e241e;
+      border-left: 3px solid #2a4a2a;
+      border-radius: 3px;
+      padding: 8px 10px;
     }
-    .ref-planet:last-child { border-bottom: none; }
-    .ref-planet-name { color: #e0e0e0; font-weight: bold; }
-    .ref-planet-name.is-mo { color: #f0c040; }
-    .ref-planet-stat { color: #666; font-size: 11px; }
-    .ref-planet-hazards { color: #888; font-size: 11px; font-style: italic; }
+    /* Faction color variants */
+    .ref-planet.terminid  { background: #110e00; border-color: #2a2400; border-left-color: #6a5800; }
+    .ref-planet.automaton { background: #110808; border-color: #2a1414; border-left-color: #6a2020; }
+    .ref-planet.illuminate{ background: #0d0814; border-color: #1e1430; border-left-color: #5a3a90; }
+
+    .ref-planet-name {
+      font-weight: bold;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+      color: #c8e0c0;
+    }
+    .ref-planet.terminid  .ref-planet-name { color: #e0cc80; }
+    .ref-planet.automaton .ref-planet-name { color: #e09090; }
+    .ref-planet.illuminate .ref-planet-name { color: #c0a0e8; }
+    .ref-planet-name.is-mo { color: #f0c040 !important; }
+
+    .ref-planet-stat { color: #7a9a7a; font-size: 11px; margin-bottom: 2px; }
+    .ref-planet.terminid  .ref-planet-stat { color: #8a8050; }
+    .ref-planet.automaton .ref-planet-stat { color: #8a6060; }
+    .ref-planet.illuminate .ref-planet-stat { color: #7070a0; }
+    .ref-planet-stat strong { color: #a0c0a0; }
+    .ref-planet.terminid  .ref-planet-stat strong { color: #c0b060; }
+    .ref-planet.automaton .ref-planet-stat strong { color: #c08080; }
+    .ref-planet.illuminate .ref-planet-stat strong { color: #9090c8; }
+
+    .ref-planet-hazards { color: #7a8a6a; font-size: 11px; font-style: italic; margin-top: 2px; }
+    .ref-planet.terminid  .ref-planet-hazards { color: #807840; }
+    .ref-planet.automaton .ref-planet-hazards { color: #806060; }
+    .ref-planet.illuminate .ref-planet-hazards { color: #706090; }
 
     .ref-mo { background: #1a1a00; border: 1px solid #3a3a00; border-radius: 3px; padding: 8px; margin-top: 8px; }
     .ref-mo-label { color: #f0c040; font-size: 11px; font-weight: bold; margin-bottom: 4px; }
@@ -213,20 +253,32 @@
     .ref-dss-action.inactive { color: #444; }
     .ref-dss-action-desc { font-size: 10px; color: #555; font-style: italic; padding-left: 10px; margin-bottom: 4px; }
 
-    .planet-notes-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; margin-bottom: 3px; }
+    .planet-notes-label {
+      color: #4a7a50;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 8px;
+      margin-bottom: 4px;
+      padding-top: 7px;
+      border-top: 1px solid #1a2e1a;
+    }
+    .ref-planet.terminid  .planet-notes-label { color: #6a5a20; border-top-color: #2a2010; }
+    .ref-planet.automaton .planet-notes-label { color: #6a3030; border-top-color: #2a1414; }
+    .ref-planet.illuminate .planet-notes-label { color: #503a80; border-top-color: #1e1430; }
     textarea.planet-notes-input {
       width: 100%;
-      height: 50px;
-      background: #0a0a0a;
-      border: 1px solid #1e2e1e;
+      height: 60px;
+      background: #080f08;
+      border: 1px solid #1e3a1e;
       border-radius: 2px;
-      color: #80a080;
+      color: #80b080;
       font-family: 'Courier New', monospace;
       font-size: 11px;
-      padding: 4px 6px;
+      padding: 5px 7px;
       resize: vertical;
     }
-    textarea.planet-notes-input:focus { outline: none; border-color: #2a4a2a; }
+    textarea.planet-notes-input:focus { outline: none; border-color: #3a6a3a; }
 
     /* Planet flavor text list */
     .planet-flavor-section { border-top: 1px solid #222; padding-top: 12px; }
@@ -429,24 +481,36 @@
 
     /* Dispatches panel */
     .dispatch-card {
-      border-bottom: 1px solid #1a1a1a;
-      padding: 8px 0;
+      background: #0d0d10;
+      border: 1px solid #222230;
+      border-left: 3px solid #2a2a50;
+      border-radius: 3px;
+      padding: 9px 11px;
+      margin-bottom: 6px;
     }
-    .dispatch-card:last-child { border-bottom: none; }
+    .dispatch-card:last-child { margin-bottom: 0; }
+    .dispatch-card:has(.dispatch-checkbox:checked) {
+      border-left-color: #5050c0;
+      background: #0e0e14;
+    }
     .dispatch-header {
-      display: flex; align-items: baseline; gap: 10px;
+      display: flex; align-items: center; gap: 10px;
     }
-    .dispatch-checkbox { accent-color: #f08040; cursor: pointer; flex-shrink: 0; margin-top: 1px; }
+    .dispatch-checkbox { accent-color: #8080f0; cursor: pointer; flex-shrink: 0; }
     .dispatch-age {
-      color: #666; font-size: 11px; min-width: 70px; flex-shrink: 0;
+      background: #1a1a2a; color: #6060a0;
+      font-size: 10px; padding: 2px 6px; border-radius: 8px;
+      flex-shrink: 0; white-space: nowrap;
     }
     .dispatch-title {
-      color: #d0a060; font-size: 12px; font-weight: bold;
+      color: #b0b0e0; font-size: 12px; font-weight: bold; letter-spacing: 0.3px;
     }
-    .dispatch-card:has(.dispatch-checkbox:checked) .dispatch-title { color: #f0c080; }
+    .dispatch-card:has(.dispatch-checkbox:checked) .dispatch-title { color: #d0d0ff; }
+    .dispatch-card:has(.dispatch-checkbox:checked) .dispatch-age { background: #20204a; color: #9090d0; }
     .dispatch-body {
-      color: #888; font-size: 11px; margin-top: 5px;
-      padding-left: 24px; white-space: pre-wrap; line-height: 1.5;
+      color: #7070a0; font-size: 11px; margin-top: 6px;
+      padding-left: 4px; white-space: pre-wrap; line-height: 1.6;
+      border-left: 2px solid #1e1e38; padding-left: 8px;
     }
   </style>
 </head>
@@ -1192,7 +1256,8 @@
     for (const theater of theaters) {
       const faction = theater.faction;
       const card = document.createElement('div');
-      card.className = 'theater-card';
+      const theaterFactionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate' }[faction] || '';
+      card.className = 'theater-card' + (theaterFactionClass ? ' ' + theaterFactionClass : '');
 
       // Header (clickable to collapse)
       const isLimited = flavor && flavor.limits && flavor.limits[faction];
@@ -1274,25 +1339,31 @@
 
   function buildRefPanelHTML(theater, planetNotes) {
     let html = '';
+    const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate' }[theater.faction] || '';
 
     for (const p of theater.planets) {
       const moTag = p.is_mo ? ' is-mo' : '';
       const hazardLines = p.hazards.map(h =>
-        `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — ' + escHtml(h.description) : ''}</div>`
+        `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — <em>' + escHtml(h.description) + '</em>' : ''}</div>`
       ).join('');
       const savedNote = (planetNotes && planetNotes[p.name]) ? planetNotes[p.name] : '';
       const regionLines = (p.regions && p.regions.length) ? p.regions.map(r => {
         const avail = r.is_available ? '✓' : '✗';
+        const iconColor = r.is_available ? '#50c050' : '#c05050';
+        const nameColor = r.is_available ? '#a0d0a0' : '#888';
         const playerStr = r.players > 0 ? ` | ${r.players} Helldivers` : '';
-        const sizeStr = r.size ? ` [${escHtml(r.size)}]` : '';
-        return `<div class="ref-planet-stat" style="padding-left:8px;color:${r.is_available ? '#aaa' : '#555'}">${avail} ${escHtml(r.name)}${sizeStr} — ${r.progress_pct}% cleared${playerStr} | ${escHtml(r.status)}</div>`;
+        const sizeStr = r.size ? ` <span style="color:#557055">${escHtml(r.size)}</span>` : '';
+        return `<div style="padding:3px 0 3px 4px;font-size:11px;display:flex;align-items:baseline;gap:6px">
+          <span style="color:${iconColor};font-size:12px;flex-shrink:0">${avail}</span>
+          <span><strong style="color:${nameColor}">${escHtml(r.name)}</strong>${sizeStr} — ${r.progress_pct}% cleared${playerStr} | <span style="color:#8aaa8a">${escHtml(r.status)}</span></span>
+        </div>`;
       }).join('') : '';
       html += `
-        <div class="ref-planet">
+        <div class="ref-planet${factionClass ? ' ' + factionClass : ''}">
           <div class="ref-planet-name${moTag}">${escHtml(p.name)}${p.is_mo ? ' ★' : ''}</div>
-          <div class="ref-planet-stat">Players: ${p.player_count} | ${p.is_defense ? 'Defense' : 'Liberation'}: ${p.progress_pct}% | ${p.time_status}</div>
-          ${p.biome ? `<div class="ref-planet-stat">Biome: ${escHtml(p.biome)}</div>` : ''}
-          ${p.biome_description ? `<div class="ref-planet-hazards" style="font-style:italic;color:#666">${escHtml(p.biome_description)}</div>` : ''}
+          <div class="ref-planet-stat"><strong>${p.player_count.toLocaleString()} players</strong> &nbsp;|&nbsp; ${p.is_defense ? 'Defense' : 'Liberation'}: <strong>${p.progress_pct}%</strong> &nbsp;|&nbsp; ${escHtml(p.time_status)}</div>
+          ${p.biome ? `<div class="ref-planet-stat">Biome: <strong>${escHtml(p.biome)}</strong></div>` : ''}
+          ${p.biome_description ? `<div class="ref-planet-hazards">${escHtml(p.biome_description)}</div>` : ''}
           ${hazardLines}
           ${regionLines ? `<div class="planet-notes-label">Population Centers</div>${regionLines}` : ''}
           <div class="planet-notes-label">Notes</div>
@@ -1456,6 +1527,7 @@
   document.getElementById('out-discord').addEventListener('input', updateCharCount);
   updateCharCount();
   initAlertTitles();
+  startRefresh();
 
   {% if outputs %}
   document.getElementById('reformat-btn').style.display = 'inline-block';
