@@ -337,24 +337,84 @@
     .api-status.checking .api-dot-label { color: #f0c040; }
     @keyframes api-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-    .options-wrapper { position: relative; }
-    .options-dropdown {
-      display: none;
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      width: 340px;
-      background: #111;
-      border: 1px solid #333;
-      border-radius: 4px;
-      padding: 14px;
-      z-index: 200;
-      max-height: 70vh;
-      overflow-y: auto;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    /* Custom modifier list per planet */
+    .custom-mod-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
     }
-    .options-dropdown.open { display: block; }
-    .options-section-label { color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    input.custom-mod-text {
+      flex: 1;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 4px 7px;
+    }
+    input.custom-mod-text:focus { outline: none; border-color: #444; }
+    input.custom-mod-text::placeholder { color: #3a3a3a; }
+    select.custom-mod-tier {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      padding: 3px 5px;
+      cursor: pointer;
+    }
+    button.custom-mod-del {
+      background: #2a1010;
+      color: #c06060;
+      border: 1px solid #4a2020;
+      border-radius: 3px;
+      font-size: 13px;
+      padding: 1px 7px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    button.custom-mod-del:hover { background: #3a1515; }
+    button.custom-mod-add-btn {
+      background: #0f1f0f;
+      color: #60a060;
+      border: 1px solid #2a4a2a;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+    button.custom-mod-add-btn:hover { background: #142014; }
+
+    /* Add-hazard row */
+    .add-hazard-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #1e1e1e; }
+    input.add-hazard-input {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      color: #c8c8c8;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 5px 8px;
+      width: 200px;
+    }
+    input.add-hazard-input:focus { outline: none; border-color: #444; }
+    input.add-hazard-input::placeholder { color: #3a3a3a; }
+
+    /* Modifiers section header */
+    .modifiers-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .modifiers-header h3 { margin: 0; }
+    .modifiers-header .toggle-icon { color: #555; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -372,30 +432,22 @@
       <span class="api-dot"></span>
       <span class="api-dot-label" id="api-dot-label"></span>
     </span>
-    <div class="options-wrapper" id="options-wrapper">
-      <button class="secondary" onclick="toggleOptionsMenu(event)">⚙ OPTIONS</button>
-      <div class="options-dropdown" id="options-dropdown">
-        <div class="options-section-label">Hazard Classifications</div>
-        <div id="hazard-list">
-          {% if classifications %}
-            {% for key, tier in classifications.items() %}
-              {% if key.startswith('hazard_') %}
-                {% set name = key[7:] %}
-                <div class="hazard-item" data-key="{{ key }}">
-                  <div class="hazard-name">{{ name }}</div>
-                  <div class="tier-radios">
-                    <label class="tier-large"><input type="radio" name="{{ key }}" value="large" {% if tier == 'large' %}checked{% endif %} onchange="saveTier('{{ key }}', 'large')"> Large</label>
-                    <label class="tier-small"><input type="radio" name="{{ key }}" value="small" {% if tier == 'small' %}checked{% endif %} onchange="saveTier('{{ key }}', 'small')"> Small</label>
-                    <label class="tier-none"> <input type="radio" name="{{ key }}" value="none"  {% if tier == 'none'  %}checked{% endif %} onchange="saveTier('{{ key }}', 'none')">  None</label>
-                  </div>
-                  <div class="hazard-desc"></div>
-                </div>
-              {% endif %}
-            {% endfor %}
-          {% else %}
-            <div class="no-hazards">No hazards classified yet — hit Refresh to load current data.</div>
-          {% endif %}
-        </div>
+  </div>
+
+  <!-- Gameplay Modifiers Panel -->
+  <div class="section" id="modifiers-section">
+    <div class="modifiers-header" onclick="toggleModifiersPanel()">
+      <h3 style="margin:0">Gameplay Modifiers</h3>
+      <span class="toggle-icon" id="modifiers-toggle-icon">▲</span>
+    </div>
+    <div id="modifiers-body">
+      <div id="hazard-list">
+        <div class="no-hazards">Run Calculations to load active planet hazards.</div>
+      </div>
+      <div class="add-hazard-row">
+        <input type="text" id="add-hazard-input" class="add-hazard-input" placeholder="Add hazard by name..."
+          onkeydown="if(event.key==='Enter') addCustomHazard()">
+        <button class="secondary" onclick="addCustomHazard()" style="padding:5px 14px;font-size:12px">+ Add</button>
       </div>
     </div>
   </div>
@@ -715,17 +767,45 @@
     }
   }
 
-  function toggleOptionsMenu(e) {
-    e.stopPropagation();
-    document.getElementById('options-dropdown').classList.toggle('open');
+  function toggleModifiersPanel() {
+    const body = document.getElementById('modifiers-body');
+    const icon = document.getElementById('modifiers-toggle-icon');
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? 'block' : 'none';
+    icon.textContent = collapsed ? '▲' : '▼';
   }
 
-  document.addEventListener('click', function(e) {
-    const wrapper = document.getElementById('options-wrapper');
-    if (wrapper && !wrapper.contains(e.target)) {
-      document.getElementById('options-dropdown').classList.remove('open');
+  function addCustomHazard() {
+    const input = document.getElementById('add-hazard-input');
+    const name = input.value.trim();
+    if (!name) return;
+    const key = 'hazard_' + name;
+
+    if (document.querySelector(`[data-key="${CSS.escape(key)}"]`)) {
+      input.value = '';
+      return;
     }
-  });
+
+    const list = document.getElementById('hazard-list');
+    const placeholder = list.querySelector('.no-hazards');
+    if (placeholder) placeholder.remove();
+
+    const div = document.createElement('div');
+    div.className = 'hazard-item';
+    div.dataset.key = key;
+    div.innerHTML = `
+      <div class="hazard-name">${escHtml(name)}</div>
+      <div class="tier-radios">
+        <label class="tier-large"><input type="radio" name="${escHtml(key)}" value="large" onchange="saveTier('${escHtml(key)}', 'large')"> Large</label>
+        <label class="tier-small"><input type="radio" name="${escHtml(key)}" value="small" onchange="saveTier('${escHtml(key)}', 'small')"> Small</label>
+        <label class="tier-none"> <input type="radio" name="${escHtml(key)}" value="none"  checked onchange="saveTier('${escHtml(key)}', 'none')">  None</label>
+      </div>
+      <div class="hazard-desc"></div>
+    `;
+    list.appendChild(div);
+    saveTier(key, 'none');
+    input.value = '';
+  }
 
   function _collectModifiers(planetItem) {
     const modifiers = {};
@@ -765,6 +845,61 @@
     saveModifiers(planetName, _collectModifiers(item));
   }
 
+  // ── Custom modifier list ──────────────────────────────────────
+
+  function buildCustomModRow(planetName, text, tier) {
+    const row = document.createElement('div');
+    row.className = 'custom-mod-row';
+    row.innerHTML = `
+      <input type="text" class="custom-mod-text" placeholder="e.g., Rainstorms — reduced visibility..." value="${escHtml(text)}">
+      <select class="custom-mod-tier">
+        <option value="large" ${tier === 'large' ? 'selected' : ''}>Large</option>
+        <option value="small" ${tier === 'small' ? 'selected' : ''}>Small</option>
+        <option value="none"  ${tier === 'none'  ? 'selected' : ''}>None</option>
+      </select>
+      <button class="custom-mod-del" title="Remove">×</button>
+    `;
+    row.querySelector('.custom-mod-text').addEventListener('input', () => saveCustomMods(row, planetName));
+    row.querySelector('.custom-mod-tier').addEventListener('change', () => saveCustomMods(row, planetName));
+    row.querySelector('.custom-mod-del').addEventListener('click', () => {
+      row.remove();
+      const dummy = document.createElement('div');
+      saveCustomMods(dummy, planetName);
+    });
+    return row;
+  }
+
+  function addCustomModRow(btn, planetName) {
+    const list = btn.closest('.custom-mod-section').querySelector('.custom-mod-list');
+    const row = buildCustomModRow(planetName, '', 'none');
+    list.appendChild(row);
+    row.querySelector('.custom-mod-text').focus();
+  }
+
+  function saveCustomMods(triggerEl, planetName) {
+    const item = triggerEl.closest?.('.planet-flavor-item') ||
+                 document.querySelector(`.planet-flavor-item:has(.custom-mod-list)`);
+    // Find the item that contains this planet
+    let targetItem = null;
+    document.querySelectorAll('.planet-flavor-item').forEach(el => {
+      const ta = el.querySelector('textarea[data-key]');
+      if (ta && ta.dataset.key === planetName) targetItem = el;
+    });
+    if (!targetItem) return;
+    const modifiers = [];
+    targetItem.querySelectorAll('.custom-mod-row').forEach(row => {
+      const text = row.querySelector('.custom-mod-text').value.trim();
+      const tier = row.querySelector('.custom-mod-tier').value;
+      if (text) modifiers.push({ text, tier });
+    });
+    fetch('/save_custom_modifiers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planet: planetName, modifiers }),
+    });
+    scheduleReformat();
+  }
+
   // ── Flavor editor ─────────────────────────────────────────────
 
   function buildFlavorEditor(theaters, flavor) {
@@ -775,8 +910,9 @@
     container.innerHTML = '';
     section.style.display = 'block';
 
-    const theaterFlavors = (flavor && flavor.theaters) ? flavor.theaters : {};
-    const planetFlavors  = (flavor && flavor.planets)  ? flavor.planets  : {};
+    const theaterFlavors   = (flavor && flavor.theaters)               ? flavor.theaters               : {};
+    const planetFlavors    = (flavor && flavor.planets)                ? flavor.planets                : {};
+    const planetCustomMods = (flavor && flavor.planet_custom_modifiers)? flavor.planet_custom_modifiers : {};
 
     for (const theater of theaters) {
       const faction = theater.faction;
@@ -836,25 +972,7 @@
         const saved = planetFlavors[planet.name] || '';
         const hasText = saved.length > 0;
 
-        // Hazard tier section
-        let hazardTierHTML = '';
-        if (planet.hazards && planet.hazards.length > 0) {
-          hazardTierHTML = `<div class="planet-hazard-tiers"><div class="planet-subgroup-label">Hazard Effects</div>`;
-          for (const h of planet.hazards) {
-            hazardTierHTML += `
-              <div class="planet-hazard-row">
-                <span class="planet-hazard-name">${escHtml(h.name)}</span>
-                <span class="tier-radios">
-                  <label class="tier-large"><input type="radio" name="${escHtml(h.key)}" value="large" ${h.tier === 'large' ? 'checked' : ''} onchange="saveTier('${escHtml(h.key)}', 'large')"> Large</label>
-                  <label class="tier-small"><input type="radio" name="${escHtml(h.key)}" value="small" ${h.tier === 'small' ? 'checked' : ''} onchange="saveTier('${escHtml(h.key)}', 'small')"> Small</label>
-                  <label class="tier-none"><input type="radio" name="${escHtml(h.key)}" value="none" ${h.tier === 'none' ? 'checked' : ''} onchange="saveTier('${escHtml(h.key)}', 'none')"> None</label>
-                </span>
-              </div>`;
-          }
-          hazardTierHTML += '</div>';
-        }
-
-        // Mission Modifiers section
+        // Mission Modifiers section (per-planet faction checkboxes)
         let modifiersHTML = '';
         if (planet.modifier_options && planet.modifier_options.length > 0) {
           const activeMods = planet.active_modifiers || {};
@@ -883,6 +1001,8 @@
           modifiersHTML += '</div>';
         }
 
+        const savedCustomMods = planetCustomMods[planet.name] || [];
+
         const item = document.createElement('div');
         item.className = 'planet-flavor-item';
         item.innerHTML = `
@@ -892,9 +1012,22 @@
           </label>
           <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
             data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
-          ${hazardTierHTML}
+          <div class="custom-mod-section">
+            <div class="planet-subgroup-label" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+              Custom Modifiers
+              <button class="custom-mod-add-btn" onclick="addCustomModRow(this, '${escHtml(planet.name)}')">+ Add</button>
+            </div>
+            <div class="custom-mod-list"></div>
+          </div>
           ${modifiersHTML}
         `;
+
+        // Build existing custom modifier rows
+        const list = item.querySelector('.custom-mod-list');
+        for (const cm of savedCustomMods) {
+          list.appendChild(buildCustomModRow(planet.name, cm.text || '', cm.tier || 'none'));
+        }
+
         planetSection.appendChild(item);
       }
 

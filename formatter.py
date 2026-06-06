@@ -42,6 +42,13 @@ _DSS_STATUS_TIER = {
     "inactive": "none",
 }
 
+_THEATER_DISPLAY = {
+    "Terminids": "TERMINID",
+    "Automaton":  "AUTOMATON",
+    "Illuminate": "ILLUMINATE",
+    "Humans":     "HUMAN",
+}
+
 _DSS_ITEM_MIX_MAP = {
     3608481516: "Req Slips",
     2985106497: "Rare Samples",
@@ -454,8 +461,11 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
         if limits.get(faction):
             theaters[faction] = theaters[faction][:1]
 
-    for faction in theater_order:
-        lines.append(f"**{faction.upper()} FRONT**")
+    for i, faction in enumerate(theater_order):
+        if i > 0:
+            lines.append("---")
+        display = _THEATER_DISPLAY.get(faction, faction.upper())
+        lines.append(f"**{display} FRONT**")
         theater_text = theater_flavors.get(faction)
         if theater_text:
             lines.append(f"*{theater_text}*")
@@ -529,6 +539,13 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
             for hazard in hazards:
                 lines.append(f"> {_format_hazard_discord(hazard, classifications)}")
+
+            for cm in (flavor_texts.get("planet_custom_modifiers") or {}).get(planet["name"], []):
+                text = cm.get("text", "").strip() if isinstance(cm, dict) else str(cm).strip()
+                tier = cm.get("tier", "none") if isinstance(cm, dict) else "none"
+                if text:
+                    pre, suf = _TIER_DISCORD.get(tier, ("", ""))
+                    lines.append(f"> {pre}{text}{suf}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
@@ -653,6 +670,13 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 lines.append("    Hazards:")
                 for hazard in hazards:
                     lines.append(f"      {_format_hazard_video(hazard, classifications)}")
+
+            for cm in (flavor_texts.get("planet_custom_modifiers") or {}).get(planet["name"], []):
+                text = cm.get("text", "").strip() if isinstance(cm, dict) else str(cm).strip()
+                tier = cm.get("tier", "none") if isinstance(cm, dict) else "none"
+                if text:
+                    transform = _TIER_VIDEO_TRANSFORM.get(tier, str.title)
+                    lines.append(f"    {transform(text)}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:

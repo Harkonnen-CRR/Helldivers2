@@ -61,8 +61,19 @@ def _load_flavor():
         data.setdefault("planet_notes", {})
         data.setdefault("planet_tags", {})
         data.setdefault("planet_modifiers", {})
+        data.setdefault("planet_custom_modifiers", {})
+        # Migrate old string format (single textarea) to new list format
+        for planet, val in list(data["planet_custom_modifiers"].items()):
+            if isinstance(val, str):
+                data["planet_custom_modifiers"][planet] = [
+                    {"text": line.strip(), "tier": "none"}
+                    for line in val.splitlines() if line.strip()
+                ]
         return data
-    return {"theaters": {}, "planets": {}, "limits": {}, "planet_notes": {}, "planet_tags": {}, "planet_modifiers": {}}
+    return {
+        "theaters": {}, "planets": {}, "limits": {}, "planet_notes": {},
+        "planet_tags": {}, "planet_modifiers": {}, "planet_custom_modifiers": {},
+    }
 
 
 def _save_flavor(flavor):
@@ -264,6 +275,23 @@ def api_ping():
         ping()
     except ApiError as e:
         return jsonify({"status": "error", "error_type": _api_error_type(e.status_code)})
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_custom_modifiers", methods=["POST"])
+def save_custom_modifiers():
+    data = request.get_json()
+    planet = data.get("planet")
+    modifiers = data.get("modifiers", [])  # list of {text, tier}
+    if not planet:
+        return jsonify({"status": "error", "message": "Missing planet"}), 400
+    state["flavor"].setdefault("planet_custom_modifiers", {})
+    valid = [m for m in modifiers if isinstance(m, dict) and m.get("text", "").strip()]
+    if valid:
+        state["flavor"]["planet_custom_modifiers"][planet] = valid
+    else:
+        state["flavor"]["planet_custom_modifiers"].pop(planet, None)
+    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
