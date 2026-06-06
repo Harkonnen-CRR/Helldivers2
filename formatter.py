@@ -183,6 +183,30 @@ def _defense_header(planet):
     return f"DEFENDED in {format_duration(lib_time)}"
 
 
+def _format_mo_task_status(status_info, discord=True):
+    """Status suffix for a major order objective: SECURE, progress%, or lib/loss time."""
+    if not status_info:
+        return ""
+    t = status_info.get("type")
+    if t == "secure":
+        return " — **SECURE** ✓" if discord else " — SECURE ✓"
+    if t not in ("liberation", "defense"):
+        return ""
+    pct = status_info.get("progress_pct", 0.0)
+    lib_time = status_info.get("liberation_time_hours")
+    if t == "defense":
+        event = status_info.get("event") or {}
+        event_remaining = _time_remaining_hours(event.get("end_time"))
+        if lib_time is not None and event_remaining is not None:
+            if lib_time > event_remaining:
+                return f" — {pct}% | LOST in {format_duration(event_remaining)}"
+            return f" — {pct}% | DEFENDED in {format_duration(lib_time)}"
+        return f" — {pct}%"
+    if lib_time is not None:
+        return f" — {pct}% | LIBERATED in {format_duration(lib_time)}"
+    return f" — {pct}%"
+
+
 def _format_region_status(region):
     if not region.get("players", 0):
         return "Secure"
@@ -444,15 +468,47 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
     if mo:
         planet_index_to_name = _load_planet_index_to_name()
         reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], f"Unknown (type {mo['reward_type']})")
-        lines.append("**MAJOR ORDER**")
+        mo_title = (flavor_texts.get("alert_titles") or {}).get("major_order", "MAJOR ORDER")
+        lines.append(f"**{mo_title}**")
         lines.append(f"> {mo['briefing']}")
         if mo.get('description'):
             lines.append(f"> {mo['description']}")
         lines.append(f"> **Reward:** {mo['reward_amount']} {reward_label}")
         lines.append(f"> **Expires in:** {format_duration(_time_remaining_hours(mo['expiration']))}")
-        lines.append("> **Tasks:**")
+        lines.append("> **Objectives:**")
+        top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
+        mo_task_statuses = parsed_data.get("mo_task_statuses", {})
         for task in mo["tasks"]:
-            lines.append(f">   • {_render_task_label(task, planet_index_to_name)}")
+            planet_idx = None
+            if task["decoded_type"] in ("liberate_planet", "defense_planet"):
+                for vtype, val in zip(task["value_types"], task["values"]):
+                    if vtype == 12:
+                        planet_idx = val
+                        break
+            status_info = None
+            if planet_idx is not None and planet_idx in mo_task_statuses:
+                status_info = dict(mo_task_statuses[planet_idx])
+                top_p = top_planets_by_index.get(planet_idx)
+                if top_p:
+                    status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
+                    status_info["event"] = top_p.get("event")
+            lines.append(f">   • {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=True)}")
+        lines.append("")
+
+    selected_ids = set(flavor_texts.get("selected_dispatches") or [])
+    selected_dispatches = [d for d in (parsed_data.get("dispatches") or []) if d["id"] in selected_ids]
+    if selected_dispatches:
+        lines.append("**RECENT INTEL**")
+        for d in selected_dispatches:
+            age = d.get("age_label", "")
+            title = d.get("title", "")
+            body = d.get("body", "")
+            header = f"{title}  |  {age}" if age else title
+            lines.append(f"> **{header}**")
+            if body:
+                for bline in body.splitlines():
+                    if bline.strip():
+                        lines.append(f"> {bline.strip()}")
         lines.append("")
 
     theater_order, theaters = _build_theaters(parsed_data)
@@ -479,7 +535,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                 outcome = _defense_header(planet)
             else:
                 lib_time = planet.get("liberation_time_hours")
-                outcome = f"Liberation in {format_duration(lib_time)}" if lib_time is not None else "Establishing a Beachhead"
+                outcome = f"LIBERATED in {format_duration(lib_time)}" if lib_time is not None else "Establishing a Beachhead"
             lines.append(f"**{planet['name']}: {outcome}**")
 
             planet_text = planet_flavors.get(planet["name"])
@@ -540,12 +596,10 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
             for hazard in hazards:
                 lines.append(f"> {_format_hazard_discord(hazard, classifications)}")
 
-            for cm in (flavor_texts.get("planet_custom_modifiers") or {}).get(planet["name"], []):
-                text = cm.get("text", "").strip() if isinstance(cm, dict) else str(cm).strip()
-                tier = cm.get("tier", "none") if isinstance(cm, dict) else "none"
-                if text:
-                    pre, suf = _TIER_DISCORD.get(tier, ("", ""))
-                    lines.append(f"> {pre}{text}{suf}")
+            for cm in (flavor_texts.get("custom_modifiers") or []):
+                if planet["name"] in cm.get("planets", []) and cm.get("text", "").strip():
+                    pre, suf = _TIER_DISCORD.get(cm.get("tier", "none"), ("", ""))
+                    lines.append(f"> {pre}{cm['text'].strip()}{suf}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
@@ -556,7 +610,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
                     status_str = f"**{status}**" if ("Secured in" in status or "Lost in" in status) else status
-                    lines.append(f"> {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared | {status_str}")
+                    lines.append(f"> **{r['name'].upper()}** ({size}{r['players']} Helldivers) — {pct}% cleared | {status_str}")
 
             lines.append("")
 
@@ -597,17 +651,50 @@ def format_video(parsed_data, classifications, flavor_texts=None):
     if mo:
         planet_index_to_name = _load_planet_index_to_name()
         reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], f"Unknown (type {mo['reward_type']})")
-        lines.append("MAJOR ORDER")
+        mo_title = (flavor_texts.get("alert_titles") or {}).get("major_order", "MAJOR ORDER")
+        lines.append(mo_title)
         lines.append(MINOR_SEP)
         lines.append(f"    {mo['briefing']}")
         if mo.get('description'):
             lines.append(f"    {mo['description']}")
         lines.append(f"    Reward: {mo['reward_amount']} {reward_label}")
         lines.append(f"    Expires in: {format_duration(_time_remaining_hours(mo['expiration']))}")
-        lines.append("    Tasks:")
+        lines.append("    Objectives:")
+        top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
+        mo_task_statuses = parsed_data.get("mo_task_statuses", {})
         for task in mo["tasks"]:
-            lines.append(f"      - {_render_task_label(task, planet_index_to_name)}")
+            planet_idx = None
+            if task["decoded_type"] in ("liberate_planet", "defense_planet"):
+                for vtype, val in zip(task["value_types"], task["values"]):
+                    if vtype == 12:
+                        planet_idx = val
+                        break
+            status_info = None
+            if planet_idx is not None and planet_idx in mo_task_statuses:
+                status_info = dict(mo_task_statuses[planet_idx])
+                top_p = top_planets_by_index.get(planet_idx)
+                if top_p:
+                    status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
+                    status_info["event"] = top_p.get("event")
+            lines.append(f"      - {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=False)}")
         lines.append("")
+
+    selected_ids = set(flavor_texts.get("selected_dispatches") or [])
+    selected_dispatches = [d for d in (parsed_data.get("dispatches") or []) if d["id"] in selected_ids]
+    if selected_dispatches:
+        lines.append(MAJOR_SEP)
+        lines.append("RECENT INTEL")
+        lines.append(MAJOR_SEP)
+        for d in selected_dispatches:
+            age = d.get("age_label", "")
+            title = d.get("title", "")
+            body = d.get("body", "")
+            lines.append(f"  [{age}] {title}" if age else f"  {title}")
+            if body:
+                for bline in body.splitlines():
+                    if bline.strip():
+                        lines.append(f"    {bline.strip()}")
+            lines.append("")
 
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
@@ -660,7 +747,7 @@ def format_video(parsed_data, classifications, flavor_texts=None):
             else:
                 lib_str = _format_lib_time(planet["liberation_time_hours"])
                 if planet["liberation_time_hours"] is not None:
-                    lines.append(f"    Time to Liberation: {lib_str}")
+                    lines.append(f"    LIBERATED in: {lib_str}")
                 else:
                     lines.append(f"    {lib_str}")
             lines.append(f"    Regen/sec: {planet['regen_per_second']:.2f}")
@@ -671,12 +758,10 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 for hazard in hazards:
                     lines.append(f"      {_format_hazard_video(hazard, classifications)}")
 
-            for cm in (flavor_texts.get("planet_custom_modifiers") or {}).get(planet["name"], []):
-                text = cm.get("text", "").strip() if isinstance(cm, dict) else str(cm).strip()
-                tier = cm.get("tier", "none") if isinstance(cm, dict) else "none"
-                if text:
-                    transform = _TIER_VIDEO_TRANSFORM.get(tier, str.title)
-                    lines.append(f"    {transform(text)}")
+            for cm in (flavor_texts.get("custom_modifiers") or []):
+                if planet["name"] in cm.get("planets", []) and cm.get("text", "").strip():
+                    transform = _TIER_VIDEO_TRANSFORM.get(cm.get("tier", "none"), str.title)
+                    lines.append(f"    {transform(cm['text'].strip())}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
@@ -825,6 +910,59 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
         })
 
     return result
+
+
+def get_modifier_panel_data(parsed_data, flavor):
+    """Returns data for the consolidated Gameplay Modifiers panel.
+
+    Builds the Special Factions rows (faction modifier × applicable planets)
+    and passes through custom_modifiers with the active planet list.
+    """
+    planet_modifiers = flavor.get("planet_modifiers", {})
+    limits = flavor.get("limits", {})
+
+    theater_order, theaters = _build_theaters(parsed_data)
+    for faction in theater_order:
+        if limits.get(faction):
+            theaters[faction] = theaters[faction][:1]
+
+    # Ordered list of active planets with their enemy faction
+    active_planets = []
+    for faction in theater_order:
+        for planet in theaters[faction]:
+            active_planets.append({
+                "name": planet["name"],
+                "faction": _enemy_faction(planet),
+            })
+
+    # One row per faction modifier; only include if ≥1 active planet matches
+    faction_rows = []
+    for faction, modifiers in _FACTION_MODIFIERS.items():
+        applicable = [p for p in active_planets if p["faction"] == faction]
+        if not applicable:
+            continue
+        for mod in modifiers:
+            planet_checks = []
+            for p in applicable:
+                saved = planet_modifiers.get(p["name"], {})
+                planet_checks.append({
+                    "name": p["name"],
+                    "checked": mod["key"] in saved,
+                    "params": saved.get(mod["key"], {}),
+                })
+            faction_rows.append({
+                "key": mod["key"],
+                "label": mod["label"],
+                "faction": faction,
+                "params": mod["params"],
+                "planets": planet_checks,
+            })
+
+    return {
+        "faction_rows": faction_rows,
+        "active_planets": active_planets,
+        "custom_modifiers": flavor.get("custom_modifiers", []),
+    }
 
 
 def save_outputs(discord_text, video_text):

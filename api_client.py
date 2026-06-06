@@ -15,6 +15,7 @@ ENDPOINTS = [
     ("https://api.helldivers2.dev/api/v1/assignments",   "data/assignments.json"),
     ("https://api.helldivers2.dev/api/v2/space-stations","data/dss.json"),
     ("https://api.helldivers2.dev/api/v1/war",           "data/war.json"),
+    ("https://api.helldivers2.dev/api/v1/dispatches",    "data/dispatches.json"),
 ]
 
 

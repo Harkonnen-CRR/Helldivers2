@@ -6,7 +6,7 @@ from flask import Flask, jsonify, render_template, request
 
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all
-from formatter import format_discord, format_video, get_theater_data
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data
 
 app = Flask(__name__)
 
@@ -61,18 +61,40 @@ def _load_flavor():
         data.setdefault("planet_notes", {})
         data.setdefault("planet_tags", {})
         data.setdefault("planet_modifiers", {})
-        data.setdefault("planet_custom_modifiers", {})
-        # Migrate old string format (single textarea) to new list format
-        for planet, val in list(data["planet_custom_modifiers"].items()):
-            if isinstance(val, str):
-                data["planet_custom_modifiers"][planet] = [
-                    {"text": line.strip(), "tier": "none"}
-                    for line in val.splitlines() if line.strip()
-                ]
+        data.setdefault("custom_modifiers", [])
+        data.setdefault("selected_dispatches", [])
+        data.setdefault("alert_titles", {
+            "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
+            "minor_order": "ALERT: MINOR ORDER UPDATE",
+            "strategic_opportunity": "ALERT: STRATEGIC OPPORTUNITY",
+        })
+        # Migrate old planet_custom_modifiers (per-planet list) into new flat list
+        old = data.pop("planet_custom_modifiers", {})
+        if old and not data["custom_modifiers"]:
+            seen = {}
+            for planet_name, mods in old.items():
+                if isinstance(mods, str):
+                    mods = [{"text": l.strip(), "tier": "none"} for l in mods.splitlines() if l.strip()]
+                for m in (mods or []):
+                    text = (m.get("text") or "").strip() if isinstance(m, dict) else str(m).strip()
+                    tier = m.get("tier", "none") if isinstance(m, dict) else "none"
+                    if not text:
+                        continue
+                    key = (text, tier)
+                    if key not in seen:
+                        seen[key] = {"text": text, "tier": tier, "planets": []}
+                    seen[key]["planets"].append(planet_name)
+            data["custom_modifiers"] = list(seen.values())
         return data
     return {
         "theaters": {}, "planets": {}, "limits": {}, "planet_notes": {},
-        "planet_tags": {}, "planet_modifiers": {}, "planet_custom_modifiers": {},
+        "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
+        "selected_dispatches": [],
+        "alert_titles": {
+            "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
+            "minor_order": "ALERT: MINOR ORDER UPDATE",
+            "strategic_opportunity": "ALERT: STRATEGIC OPPORTUNITY",
+        },
     }
 
 
@@ -106,6 +128,7 @@ def index():
         "index.html",
         classifications=state["classifications"],
         outputs=state["last_outputs"],
+        alert_titles=state["flavor"].get("alert_titles", {}),
     )
 
 
@@ -149,11 +172,14 @@ def refresh():
     }
 
     theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"], state["flavor"].get("planet_modifiers", {}))
+    modifier_panel = get_modifier_panel_data(parsed, state["flavor"])
 
     return jsonify({
         "status": "ok",
         "items": items_with_state,
         "theaters": theaters,
+        "modifier_panel": modifier_panel,
+        "dispatches": parsed.get("dispatches", []),
         "flavor": state["flavor"],
     })
 
@@ -201,6 +227,7 @@ def fetch2():
 
     state["last_parsed"] = parsed
     theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"], state["flavor"].get("planet_modifiers", {}))
+    modifier_panel = get_modifier_panel_data(parsed, state["flavor"])
     discord_text = format_discord(parsed, state["classifications"], state["flavor"])
     video_text = format_video(parsed, state["classifications"], state["flavor"])
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
@@ -210,6 +237,8 @@ def fetch2():
         "discord": discord_text,
         "video": video_text,
         "theaters": theaters,
+        "modifier_panel": modifier_panel,
+        "dispatches": parsed.get("dispatches", []),
         "flavor": state["flavor"],
     })
 
@@ -244,7 +273,7 @@ def save_flavor():
     scope = data.get("scope")
     key = data.get("key")
     value = data.get("value", "")
-    if scope not in ("theaters", "planets", "planet_notes") or not key:
+    if scope not in ("theaters", "planets", "planet_notes", "alert_titles") or not key:
         return jsonify({"status": "error", "message": "Invalid scope or key"}), 400
     if value:
         state["flavor"][scope][key] = value
@@ -280,33 +309,53 @@ def api_ping():
 
 @app.route("/save_custom_modifiers", methods=["POST"])
 def save_custom_modifiers():
+    """Saves the full custom_modifiers list: [{text, tier, planets: [...]}]."""
     data = request.get_json()
-    planet = data.get("planet")
-    modifiers = data.get("modifiers", [])  # list of {text, tier}
-    if not planet:
-        return jsonify({"status": "error", "message": "Missing planet"}), 400
-    state["flavor"].setdefault("planet_custom_modifiers", {})
-    valid = [m for m in modifiers if isinstance(m, dict) and m.get("text", "").strip()]
-    if valid:
-        state["flavor"]["planet_custom_modifiers"][planet] = valid
-    else:
-        state["flavor"]["planet_custom_modifiers"].pop(planet, None)
+    modifiers = data.get("modifiers", [])
+    valid = [
+        m for m in modifiers
+        if isinstance(m, dict) and m.get("text", "").strip()
+    ]
+    state["flavor"]["custom_modifiers"] = valid
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
-@app.route("/save_modifiers", methods=["POST"])
-def save_modifiers():
+@app.route("/save_faction_modifier", methods=["POST"])
+def save_faction_modifier():
+    """Toggles a single faction modifier key on/off for a planet."""
     data = request.get_json()
     planet = data.get("planet")
-    modifiers = data.get("modifiers", {})
-    if not planet:
-        return jsonify({"status": "error", "message": "Missing planet"}), 400
+    key = data.get("key")
+    checked = data.get("checked", False)
+    params = data.get("params", {})
+    if not planet or not key:
+        return jsonify({"status": "error", "message": "Missing planet or key"}), 400
     state["flavor"].setdefault("planet_modifiers", {})
-    if modifiers:
-        state["flavor"]["planet_modifiers"][planet] = modifiers
+    planet_mods = state["flavor"]["planet_modifiers"].setdefault(planet, {})
+    if checked:
+        planet_mods[key] = params
     else:
+        planet_mods.pop(key, None)
+    if not planet_mods:
         state["flavor"]["planet_modifiers"].pop(planet, None)
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_dispatch_selection", methods=["POST"])
+def save_dispatch_selection():
+    """Toggles a dispatch ID in the selected_dispatches list."""
+    data = request.get_json()
+    dispatch_id = data.get("id")
+    checked = data.get("checked", False)
+    if dispatch_id is None:
+        return jsonify({"status": "error", "message": "Missing id"}), 400
+    selected = state["flavor"].setdefault("selected_dispatches", [])
+    if checked and dispatch_id not in selected:
+        selected.append(dispatch_id)
+    elif not checked and dispatch_id in selected:
+        selected.remove(dispatch_id)
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 

@@ -1,5 +1,7 @@
 import json
 import os
+import re
+from datetime import datetime, timezone
 
 
 _TASK_TYPE_MAP = {
@@ -98,6 +100,59 @@ def _build_planet(planet, campaigns_by_index):
     }
 
 
+def _build_mo_task_statuses(assignments, planets_data, campaigns_by_index):
+    """Returns {planet_index: {type, progress_pct}} for each planet-linked MO task."""
+    if not assignments:
+        return {}
+    a = assignments[0]
+    planet_by_index = {p["index"]: p for p in planets_data}
+    statuses = {}
+    progress = a.get("progress") or []
+
+    for i, t in enumerate(a.get("tasks", [])):
+        decoded = _TASK_TYPE_MAP.get(t["type"], "")
+        if decoded not in ("liberate_planet", "defense_planet"):
+            continue
+
+        planet_idx = None
+        for vtype, val in zip(t.get("valueTypes", []), t.get("values", [])):
+            if vtype == 12:
+                planet_idx = val
+                break
+        if planet_idx is None:
+            continue
+
+        task_progress = progress[i] if i < len(progress) else None
+        if task_progress is not None and task_progress >= 1:
+            statuses[planet_idx] = {"type": "secure"}
+            continue
+
+        planet = planet_by_index.get(planet_idx)
+        if not planet:
+            continue
+
+        campaign = campaigns_by_index.get(planet_idx)
+        event = planet.get("event")
+        is_defense = event is not None and event.get("eventType") == 1
+
+        if planet.get("currentOwner") == "Humans" and not campaign:
+            statuses[planet_idx] = {"type": "secure"}
+        elif is_defense:
+            health = event["health"]
+            max_health = event["maxHealth"]
+            pct = round((1 - health / max_health) * 100, 2) if max_health else 0.0
+            statuses[planet_idx] = {"type": "defense", "progress_pct": pct}
+        elif campaign:
+            health = planet["health"]
+            max_health = planet["maxHealth"]
+            pct = round((1 - health / max_health) * 100, 2) if max_health else 0.0
+            statuses[planet_idx] = {"type": "liberation", "progress_pct": pct}
+        else:
+            statuses[planet_idx] = {"type": "not_started"}
+
+    return statuses
+
+
 def _build_major_order(assignments):
     if not assignments:
         return None
@@ -157,12 +212,61 @@ def _build_dss(dss_data):
     }
 
 
+def _strip_dispatch_tags(text):
+    """Remove HD2 inline formatting tags like <i=1>, <br>, etc."""
+    return re.sub(r"<[^>]+>", "", text or "").strip()
+
+
+def _dispatch_age_label(published_str, now):
+    """Returns 'Today', 'Yesterday', 'X days ago' relative to now (UTC date comparison)."""
+    try:
+        published = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return ""
+    delta = (now.date() - published.astimezone(timezone.utc).date()).days
+    if delta == 0:
+        return "Today"
+    if delta == 1:
+        return "Yesterday"
+    return f"{delta} days ago"
+
+
+def _build_dispatches(dispatches_data):
+    """Returns dispatches published within the last 7 days, most recent first."""
+    if not dispatches_data:
+        return []
+    now = datetime.now(timezone.utc)
+    results = []
+    for d in dispatches_data:
+        published_str = d.get("published", "")
+        try:
+            published = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        if (now - published).days > 7:
+            continue
+        clean = _strip_dispatch_tags(d.get("message", ""))
+        lines = [l.strip() for l in clean.splitlines() if l.strip()]
+        title = lines[0] if lines else ""
+        body = "\n".join(lines[1:]) if len(lines) > 1 else ""
+        results.append({
+            "id": d["id"],
+            "published": published_str,
+            "age_label": _dispatch_age_label(published_str, now),
+            "title": title,
+            "body": body,
+        })
+    results.sort(key=lambda x: x["published"], reverse=True)
+    return results
+
+
 def parse_all():
     planets_data = _load("planets.json")
     campaigns_data = _load("campaigns.json")
     assignments_data = _load("assignments.json")
     dss_data = _load("dss.json")
     war_data = _load("war.json")
+    dispatches_data = _load("dispatches.json") if os.path.exists(os.path.join("data", "dispatches.json")) else []
 
     impact_multiplier = war_data["impactMultiplier"]
 
@@ -174,6 +278,8 @@ def parse_all():
     return {
         "planets": planets,
         "major_order": _build_major_order(assignments_data),
+        "mo_task_statuses": _build_mo_task_statuses(assignments_data, planets_data, campaigns_by_index),
         "dss": _build_dss(dss_data),
+        "dispatches": _build_dispatches(dispatches_data),
         "meta": {"impact_multiplier": impact_multiplier},
     }

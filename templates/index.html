@@ -337,84 +337,117 @@
     .api-status.checking .api-dot-label { color: #f0c040; }
     @keyframes api-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-    /* Custom modifier list per planet */
+    /* Modifiers panel header */
+    .modifiers-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px; cursor: pointer; user-select: none;
+    }
+    .modifiers-header h3 { margin: 0; }
+    .modifiers-header .toggle-icon { color: #555; font-size: 11px; }
+
+    /* Sub-section dividers inside modifiers panel */
+    .mod-subsection { margin-bottom: 16px; }
+    .mod-subsection-label {
+      color: #555; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 8px; padding-bottom: 4px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+
+    /* Special faction rows */
+    .faction-mod-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 5px 0; border-bottom: 1px solid #1a1a1a; flex-wrap: wrap;
+    }
+    .faction-mod-row:last-child { border-bottom: none; }
+    .faction-mod-label { color: #c0c0c0; font-size: 12px; min-width: 160px; font-weight: bold; }
+    .faction-mod-row.terminid .faction-mod-label { color: #c8a000; }
+    .faction-mod-row.automaton .faction-mod-label { color: #c84040; }
+    .faction-mod-row.illuminate .faction-mod-label { color: #9060c0; }
+    .faction-mod-planet-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+    .faction-planet-check { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; color: #888; }
+    .faction-planet-check input[type=checkbox] { accent-color: #f08040; cursor: pointer; }
+    .faction-planet-check:has(input:checked) { color: #f08040; }
+    .faction-mod-params { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .faction-mod-param { display: none; align-items: center; gap: 4px; font-size: 10px; color: #666; }
+    .faction-mod-param.visible { display: flex; }
+    .faction-mod-param select { background: #1a1a1a; border: 1px solid #333; color: #c0c0c0; font-size: 11px; padding: 1px 4px; border-radius: 2px; }
+
+    /* Custom modifier rows in modifiers panel */
     .custom-mod-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 5px; flex-wrap: wrap;
     }
     input.custom-mod-text {
-      flex: 1;
-      background: #111;
-      border: 1px solid #2a2a2a;
-      border-radius: 3px;
-      color: #c8c8c8;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      padding: 4px 7px;
+      flex: 1; min-width: 180px;
+      background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace;
+      font-size: 12px; padding: 4px 7px;
     }
     input.custom-mod-text:focus { outline: none; border-color: #444; }
     input.custom-mod-text::placeholder { color: #3a3a3a; }
     select.custom-mod-tier {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 3px;
-      color: #c8c8c8;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      padding: 3px 5px;
-      cursor: pointer;
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace;
+      font-size: 11px; padding: 3px 5px; cursor: pointer;
     }
+    .custom-mod-planets { display: flex; gap: 8px; flex-wrap: wrap; }
+    .custom-planet-check { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #888; cursor: pointer; }
+    .custom-planet-check input[type=checkbox] { accent-color: #80d080; cursor: pointer; }
+    .custom-planet-check:has(input:checked) { color: #80d080; }
     button.custom-mod-del {
-      background: #2a1010;
-      color: #c06060;
-      border: 1px solid #4a2020;
-      border-radius: 3px;
-      font-size: 13px;
-      padding: 1px 7px;
-      cursor: pointer;
-      line-height: 1;
+      background: #2a1010; color: #c06060; border: 1px solid #4a2020;
+      border-radius: 3px; font-size: 13px; padding: 1px 7px;
+      cursor: pointer; line-height: 1; flex-shrink: 0;
     }
     button.custom-mod-del:hover { background: #3a1515; }
-    button.custom-mod-add-btn {
-      background: #0f1f0f;
-      color: #60a060;
-      border: 1px solid #2a4a2a;
-      border-radius: 3px;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      padding: 2px 8px;
-      cursor: pointer;
+    button.mod-add-btn {
+      background: #0f1f0f; color: #60a060; border: 1px solid #2a4a2a;
+      border-radius: 3px; font-family: 'Courier New', monospace;
+      font-size: 11px; padding: 2px 8px; cursor: pointer; margin-top: 4px;
     }
-    button.custom-mod-add-btn:hover { background: #142014; }
+    button.mod-add-btn:hover { background: #142014; }
 
-    /* Add-hazard row */
-    .add-hazard-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #1e1e1e; }
-    input.add-hazard-input {
-      background: #111;
-      border: 1px solid #2a2a2a;
-      border-radius: 3px;
-      color: #c8c8c8;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      padding: 5px 8px;
-      width: 200px;
+    /* Alert titles section */
+    .alert-title-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid #1a1a1a; flex-wrap: wrap;
     }
-    input.add-hazard-input:focus { outline: none; border-color: #444; }
-    input.add-hazard-input::placeholder { color: #3a3a3a; }
+    .alert-title-row:last-child { border-bottom: none; }
+    .alert-title-label { color: #888; font-size: 12px; min-width: 160px; }
+    select.alert-title-select {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace; font-size: 12px;
+      padding: 4px 6px; cursor: pointer; flex: 1; min-width: 240px;
+    }
+    select.alert-title-select:focus { outline: none; border-color: #444; }
+    input.alert-title-custom {
+      background: #111; border: 1px solid #3a3a00; border-radius: 3px;
+      color: #f0c040; font-family: 'Courier New', monospace; font-size: 12px;
+      padding: 4px 7px; flex: 1; min-width: 240px;
+    }
+    input.alert-title-custom:focus { outline: none; border-color: #666600; }
 
-    /* Modifiers section header */
-    .modifiers-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      user-select: none;
+    /* Dispatches panel */
+    .dispatch-card {
+      border-bottom: 1px solid #1a1a1a;
+      padding: 8px 0;
     }
-    .modifiers-header h3 { margin: 0; }
-    .modifiers-header .toggle-icon { color: #555; font-size: 11px; }
+    .dispatch-card:last-child { border-bottom: none; }
+    .dispatch-header {
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .dispatch-checkbox { accent-color: #f08040; cursor: pointer; flex-shrink: 0; margin-top: 1px; }
+    .dispatch-age {
+      color: #666; font-size: 11px; min-width: 70px; flex-shrink: 0;
+    }
+    .dispatch-title {
+      color: #d0a060; font-size: 12px; font-weight: bold;
+    }
+    .dispatch-card:has(.dispatch-checkbox:checked) .dispatch-title { color: #f0c080; }
+    .dispatch-body {
+      color: #888; font-size: 11px; margin-top: 5px;
+      padding-left: 24px; white-space: pre-wrap; line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -434,6 +467,13 @@
     </span>
   </div>
 
+  <!-- Progress bar -->
+  <div class="section" id="progress-section">
+    <div class="progress-label">⚙ LIBERATION RATE CALCULATION IN PROGRESS</div>
+    <div class="progress-bar-track"><div id="progress-fill"></div></div>
+    <div class="progress-time" id="progress-time">60s remaining</div>
+  </div>
+
   <!-- Gameplay Modifiers Panel -->
   <div class="section" id="modifiers-section">
     <div class="modifiers-header" onclick="toggleModifiersPanel()">
@@ -441,22 +481,96 @@
       <span class="toggle-icon" id="modifiers-toggle-icon">▲</span>
     </div>
     <div id="modifiers-body">
-      <div id="hazard-list">
-        <div class="no-hazards">Run Calculations to load active planet hazards.</div>
+
+      <!-- Hazard Effects -->
+      <div class="mod-subsection">
+        <div class="mod-subsection-label">Hazard Effects</div>
+        <div id="hazard-list">
+          <div class="no-hazards">Run Calculations to load active planet hazards.</div>
+        </div>
       </div>
-      <div class="add-hazard-row">
-        <input type="text" id="add-hazard-input" class="add-hazard-input" placeholder="Add hazard by name..."
-          onkeydown="if(event.key==='Enter') addCustomHazard()">
-        <button class="secondary" onclick="addCustomHazard()" style="padding:5px 14px;font-size:12px">+ Add</button>
+
+      <!-- Special Factions -->
+      <div class="mod-subsection">
+        <div class="mod-subsection-label">Special Factions</div>
+        <div id="faction-mod-list">
+          <div class="no-hazards">Run Calculations to load faction modifiers.</div>
+        </div>
       </div>
+
+      <!-- Custom Modifiers -->
+      <div class="mod-subsection">
+        <div class="mod-subsection-label" style="display:flex;align-items:center;gap:8px">
+          Custom Modifiers
+          <button class="mod-add-btn" id="custom-mod-add-btn" onclick="addCustomModRow()" style="margin-top:0">+ Add</button>
+        </div>
+        <div id="custom-mod-list">
+          <div class="no-hazards" id="custom-mod-empty">No custom modifiers — click + Add.</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- Progress bar -->
-  <div class="section" id="progress-section">
-    <div class="progress-label">⚙ LIBERATION RATE CALCULATION IN PROGRESS</div>
-    <div class="progress-bar-track"><div id="progress-fill"></div></div>
-    <div class="progress-time" id="progress-time">60s remaining</div>
+  <!-- Alert Titles Section -->
+  <div class="section" id="alert-titles-section">
+    <div class="modifiers-header" onclick="toggleSection('alert-titles-body', 'alert-titles-icon')">
+      <h3 style="margin:0">Alert Titles</h3>
+      <span class="toggle-icon" id="alert-titles-icon">▲</span>
+    </div>
+    <div id="alert-titles-body">
+
+      <div class="alert-title-row">
+        <span class="alert-title-label">Major Order</span>
+        <select class="alert-title-select" data-section="major_order" onchange="handleAlertSelect(this)">
+          <option value="PRIORITY ALERT: NEW MAJOR ORDER">PRIORITY ALERT: NEW MAJOR ORDER</option>
+          <option value="PRIORITY ALERT: MAJOR ORDER WON">PRIORITY ALERT: MAJOR ORDER WON</option>
+          <option value="PRIORITY ALERT: MAJOR ORDER LOST">PRIORITY ALERT: MAJOR ORDER LOST</option>
+          <option value="ALERT: MAJOR ORDER UPDATE">ALERT: MAJOR ORDER UPDATE</option>
+          <option value="ALERT: GALACTIC WAR UPDATE">ALERT: GALACTIC WAR UPDATE</option>
+          <option value="__pa_custom__">PRIORITY ALERT: Custom...</option>
+          <option value="__al_custom__">ALERT: Custom...</option>
+        </select>
+        <input type="text" class="alert-title-custom" data-section="major_order" placeholder="type full title..." style="display:none">
+      </div>
+
+      <div class="alert-title-row">
+        <span class="alert-title-label">Minor Order</span>
+        <select class="alert-title-select" data-section="minor_order" onchange="handleAlertSelect(this)">
+          <option value="PRIORITY ALERT: NEW MINOR ORDER">PRIORITY ALERT: NEW MINOR ORDER</option>
+          <option value="ALERT: MINOR ORDER UPDATE">ALERT: MINOR ORDER UPDATE</option>
+          <option value="ALERT: MINOR ORDER COMPLETE">ALERT: MINOR ORDER COMPLETE</option>
+          <option value="__pa_custom__">PRIORITY ALERT: Custom...</option>
+          <option value="__al_custom__">ALERT: Custom...</option>
+        </select>
+        <input type="text" class="alert-title-custom" data-section="minor_order" placeholder="type full title..." style="display:none">
+      </div>
+
+      <div class="alert-title-row">
+        <span class="alert-title-label">Strategic Opportunity</span>
+        <select class="alert-title-select" data-section="strategic_opportunity" onchange="handleAlertSelect(this)">
+          <option value="ALERT: STRATEGIC OPPORTUNITY">ALERT: STRATEGIC OPPORTUNITY</option>
+          <option value="PRIORITY ALERT: STRATEGIC OPPORTUNITY IDENTIFIED">PRIORITY ALERT: STRATEGIC OPPORTUNITY IDENTIFIED</option>
+          <option value="__pa_custom__">PRIORITY ALERT: Custom...</option>
+          <option value="__al_custom__">ALERT: Custom...</option>
+        </select>
+        <input type="text" class="alert-title-custom" data-section="strategic_opportunity" placeholder="type full title..." style="display:none">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Dispatches Panel -->
+  <div class="section" id="dispatches-section">
+    <div class="modifiers-header" onclick="toggleSection('dispatches-body', 'dispatches-icon')">
+      <h3 style="margin:0">Dispatches</h3>
+      <span class="toggle-icon" id="dispatches-icon">▲</span>
+    </div>
+    <div id="dispatches-body">
+      <div id="dispatch-list">
+        <div class="no-hazards">Run Refresh to load recent dispatches.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Flavor editor -->
@@ -519,6 +633,7 @@
 <script>
   const COUNTDOWN = 60;
   let countdownInterval = null;
+  const _savedAlertTitles = {{ alert_titles | tojson }};
 
   // Search state per output panel
   const searchState = {
@@ -562,6 +677,8 @@
     stopApiPolling();
     hideApiDot();
     updateClassificationPanel(data.items);
+    buildModifierPanel(data.modifier_panel, data.flavor);
+    buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFlavorEditor(data.theaters, data.flavor);
     startCountdown();
   }
@@ -620,6 +737,8 @@
     updateCharCount();
     document.getElementById('reformat-btn').style.display = 'inline-block';
     document.getElementById('reformat-flavor-btn').style.display = 'inline-block';
+    buildModifierPanel(data.modifier_panel, data.flavor);
+    buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFlavorEditor(data.theaters, data.flavor);
   }
 
@@ -767,89 +886,249 @@
     }
   }
 
-  function toggleModifiersPanel() {
-    const body = document.getElementById('modifiers-body');
-    const icon = document.getElementById('modifiers-toggle-icon');
+  function toggleSection(bodyId, iconId) {
+    const body = document.getElementById(bodyId);
+    const icon = document.getElementById(iconId);
     const collapsed = body.style.display === 'none';
     body.style.display = collapsed ? 'block' : 'none';
     icon.textContent = collapsed ? '▲' : '▼';
   }
 
-  function addCustomHazard() {
-    const input = document.getElementById('add-hazard-input');
-    const name = input.value.trim();
-    if (!name) return;
-    const key = 'hazard_' + name;
+  function toggleModifiersPanel() { toggleSection('modifiers-body', 'modifiers-toggle-icon'); }
 
-    if (document.querySelector(`[data-key="${CSS.escape(key)}"]`)) {
-      input.value = '';
-      return;
+  // ── Alert Titles ──────────────────────────────────────────────
+
+  function handleAlertSelect(sel) {
+    const section = sel.dataset.section;
+    const row = sel.closest('.alert-title-row');
+    const input = row.querySelector('.alert-title-custom');
+    const val = sel.value;
+    if (val === '__pa_custom__') {
+      input.style.display = 'inline-block';
+      if (!input.value) input.value = 'PRIORITY ALERT: ';
+      input.focus();
+    } else if (val === '__al_custom__') {
+      input.style.display = 'inline-block';
+      if (!input.value) input.value = 'ALERT: ';
+      input.focus();
+    } else {
+      input.style.display = 'none';
+      saveAlertTitle(section, val);
     }
-
-    const list = document.getElementById('hazard-list');
-    const placeholder = list.querySelector('.no-hazards');
-    if (placeholder) placeholder.remove();
-
-    const div = document.createElement('div');
-    div.className = 'hazard-item';
-    div.dataset.key = key;
-    div.innerHTML = `
-      <div class="hazard-name">${escHtml(name)}</div>
-      <div class="tier-radios">
-        <label class="tier-large"><input type="radio" name="${escHtml(key)}" value="large" onchange="saveTier('${escHtml(key)}', 'large')"> Large</label>
-        <label class="tier-small"><input type="radio" name="${escHtml(key)}" value="small" onchange="saveTier('${escHtml(key)}', 'small')"> Small</label>
-        <label class="tier-none"> <input type="radio" name="${escHtml(key)}" value="none"  checked onchange="saveTier('${escHtml(key)}', 'none')">  None</label>
-      </div>
-      <div class="hazard-desc"></div>
-    `;
-    list.appendChild(div);
-    saveTier(key, 'none');
-    input.value = '';
   }
 
-  function _collectModifiers(planetItem) {
-    const modifiers = {};
-    planetItem.querySelectorAll('.planet-modifier-toggle input[type=checkbox]').forEach(cb => {
-      if (!cb.checked) return;
-      const key = cb.dataset.mod;
-      const params = {};
-      planetItem.querySelectorAll(`.planet-modifier-param[data-mod="${key}"]`).forEach(p => {
-        const sel = p.querySelector('select');
-        if (sel) params[p.dataset.param] = sel.value;
-      });
-      modifiers[key] = params;
-    });
-    return modifiers;
-  }
-
-  async function saveModifiers(planetName, modifiers) {
-    await fetch('/save_modifiers', {
+  function saveAlertTitle(section, value) {
+    fetch('/save_flavor', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planet: planetName, modifiers }),
+      body: JSON.stringify({ scope: 'alert_titles', key: section, value }),
     });
     scheduleReformat();
   }
 
-  function handleModifierToggle(planetName, modKey, checked) {
-    const item = event.target.closest('.planet-flavor-item');
-    // Show/hide param controls for this modifier
-    item.querySelectorAll(`.planet-modifier-param[data-mod="${modKey}"]`).forEach(p => {
-      p.classList.toggle('visible', checked);
+  function initAlertTitles() {
+    document.querySelectorAll('.alert-title-row').forEach(row => {
+      const section = row.querySelector('.alert-title-select').dataset.section;
+      const sel = row.querySelector('.alert-title-select');
+      const input = row.querySelector('.alert-title-custom');
+      const saved = (_savedAlertTitles && _savedAlertTitles[section]) || '';
+      if (!saved) return;
+      const preset = [...sel.options].find(o => o.value === saved);
+      if (preset) {
+        sel.value = saved;
+      } else if (saved.startsWith('PRIORITY ALERT:')) {
+        sel.value = '__pa_custom__';
+        input.value = saved;
+        input.style.display = 'inline-block';
+      } else {
+        sel.value = '__al_custom__';
+        input.value = saved;
+        input.style.display = 'inline-block';
+      }
     });
-    saveModifiers(planetName, _collectModifiers(item));
+    // Wire custom inputs to auto-save
+    document.querySelectorAll('.alert-title-custom').forEach(inp => {
+      inp.addEventListener('input', () => saveAlertTitle(inp.dataset.section, inp.value));
+    });
   }
 
-  function handleModifierParam(planetName, modKey, paramKey, value) {
-    const item = event.target.closest('.planet-flavor-item');
-    saveModifiers(planetName, _collectModifiers(item));
+
+
+  // ── Modifier panel (Special Factions + Custom Modifiers) ─────
+
+  let _activePlanetNames = [];
+
+  function buildModifierPanel(modPanel, flavor) {
+    if (!modPanel) return;
+    _activePlanetNames = (modPanel.active_planets || []).map(p => p.name);
+
+    // Special Factions
+    const factionList = document.getElementById('faction-mod-list');
+    factionList.innerHTML = '';
+    if (!modPanel.faction_rows || modPanel.faction_rows.length === 0) {
+      factionList.innerHTML = '<div class="no-hazards">No applicable faction modifiers for current planets.</div>';
+    } else {
+      for (const row of modPanel.faction_rows) {
+        factionList.appendChild(buildFactionModRow(row));
+      }
+    }
+
+    // Custom Modifiers — rebuild from saved list
+    const customList = document.getElementById('custom-mod-list');
+    customList.innerHTML = '';
+    const saved = (flavor && flavor.custom_modifiers) || [];
+    if (saved.length === 0) {
+      customList.innerHTML = '<div class="no-hazards" id="custom-mod-empty">No custom modifiers — click + Add.</div>';
+    } else {
+      for (const cm of saved) {
+        customList.appendChild(buildCustomModRow(cm.text || '', cm.tier || 'none', cm.planets || []));
+      }
+    }
   }
 
-  // ── Custom modifier list ──────────────────────────────────────
+  function buildDispatchPanel(dispatches, flavor) {
+    const list = document.getElementById('dispatch-list');
+    list.innerHTML = '';
+    const selected = new Set((flavor && flavor.selected_dispatches) || []);
 
-  function buildCustomModRow(planetName, text, tier) {
+    if (!dispatches || dispatches.length === 0) {
+      list.innerHTML = '<div class="no-hazards">No dispatches in the last 7 days.</div>';
+      return;
+    }
+
+    for (const d of dispatches) {
+      const card = document.createElement('div');
+      card.className = 'dispatch-card';
+
+      const header = document.createElement('div');
+      header.className = 'dispatch-header';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'dispatch-checkbox';
+      cb.checked = selected.has(d.id);
+      cb.addEventListener('change', () => {
+        fetch('/save_dispatch_selection', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({id: d.id, checked: cb.checked})
+        });
+      });
+
+      const age = document.createElement('span');
+      age.className = 'dispatch-age';
+      age.textContent = d.age_label || '';
+
+      const title = document.createElement('span');
+      title.className = 'dispatch-title';
+      title.textContent = d.title || '';
+
+      header.appendChild(cb);
+      header.appendChild(age);
+      header.appendChild(title);
+      card.appendChild(header);
+
+      if (d.body) {
+        const body = document.createElement('div');
+        body.className = 'dispatch-body';
+        body.textContent = d.body;
+        card.appendChild(body);
+      }
+
+      list.appendChild(card);
+    }
+  }
+
+  function buildFactionModRow(modData) {
+    const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate' }[modData.faction] || '';
+    const row = document.createElement('div');
+    row.className = 'faction-mod-row' + (factionClass ? ' ' + factionClass : '');
+    row.dataset.modKey = modData.key;
+
+    let planetChecksHTML = '';
+    for (const p of modData.planets) {
+      planetChecksHTML += `
+        <label class="faction-planet-check">
+          <input type="checkbox" data-planet="${escHtml(p.name)}" ${p.checked ? 'checked' : ''}>
+          ${escHtml(p.name)}
+        </label>`;
+    }
+
+    let paramsHTML = '';
+    for (const param of (modData.params || [])) {
+      paramsHTML += `<span class="faction-mod-param" data-param="${escHtml(param.key)}">
+        <span>${escHtml(param.label)}:</span>
+        <select>
+          ${param.options.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('')}
+        </select>
+      </span>`;
+    }
+
+    row.innerHTML = `
+      <div class="faction-mod-label">${escHtml(modData.label)}</div>
+      <div class="faction-mod-planet-checks">${planetChecksHTML}</div>
+      ${paramsHTML ? `<div class="faction-mod-params">${paramsHTML}</div>` : ''}
+    `;
+
+    // Pre-fill param values from saved state
+    for (const p of modData.planets) {
+      if (p.checked && p.params) {
+        for (const [paramKey, paramVal] of Object.entries(p.params)) {
+          const paramEl = row.querySelector(`.faction-mod-param[data-param="${paramKey}"] select`);
+          if (paramEl) paramEl.value = paramVal;
+        }
+      }
+    }
+    // Show params if any planet is checked
+    _updateFactionParamVisibility(row);
+
+    row.querySelectorAll('.faction-planet-check input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        _updateFactionParamVisibility(row);
+        _saveFactionModRow(row, modData.key);
+      });
+    });
+    row.querySelectorAll('.faction-mod-params select').forEach(sel => {
+      sel.addEventListener('change', () => _saveFactionModRow(row, modData.key));
+    });
+
+    return row;
+  }
+
+  function _updateFactionParamVisibility(row) {
+    const anyChecked = [...row.querySelectorAll('.faction-planet-check input')].some(cb => cb.checked);
+    row.querySelectorAll('.faction-mod-param').forEach(p => p.classList.toggle('visible', anyChecked));
+  }
+
+  function _saveFactionModRow(row, modKey) {
+    const params = {};
+    row.querySelectorAll('.faction-mod-param').forEach(p => {
+      const sel = p.querySelector('select');
+      if (sel) params[p.dataset.param] = sel.value;
+    });
+    row.querySelectorAll('.faction-planet-check input').forEach(cb => {
+      fetch('/save_faction_modifier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planet: cb.dataset.planet, key: modKey, checked: cb.checked, params }),
+      });
+    });
+    scheduleReformat();
+  }
+
+  function buildCustomModRow(text, tier, checkedPlanets) {
     const row = document.createElement('div');
     row.className = 'custom-mod-row';
+
+    let planetChecksHTML = '';
+    for (const pName of _activePlanetNames) {
+      const isChecked = checkedPlanets.includes(pName);
+      planetChecksHTML += `
+        <label class="custom-planet-check">
+          <input type="checkbox" ${isChecked ? 'checked' : ''}> ${escHtml(pName)}
+        </label>`;
+    }
+
     row.innerHTML = `
       <input type="text" class="custom-mod-text" placeholder="e.g., Rainstorms — reduced visibility..." value="${escHtml(text)}">
       <select class="custom-mod-tier">
@@ -857,45 +1136,42 @@
         <option value="small" ${tier === 'small' ? 'selected' : ''}>Small</option>
         <option value="none"  ${tier === 'none'  ? 'selected' : ''}>None</option>
       </select>
+      <div class="custom-mod-planets">${planetChecksHTML}</div>
       <button class="custom-mod-del" title="Remove">×</button>
     `;
-    row.querySelector('.custom-mod-text').addEventListener('input', () => saveCustomMods(row, planetName));
-    row.querySelector('.custom-mod-tier').addEventListener('change', () => saveCustomMods(row, planetName));
-    row.querySelector('.custom-mod-del').addEventListener('click', () => {
-      row.remove();
-      const dummy = document.createElement('div');
-      saveCustomMods(dummy, planetName);
-    });
+
+    const save = () => saveAllCustomMods();
+    row.querySelector('.custom-mod-text').addEventListener('input', save);
+    row.querySelector('.custom-mod-tier').addEventListener('change', save);
+    row.querySelectorAll('.custom-planet-check input').forEach(cb => cb.addEventListener('change', save));
+    row.querySelector('.custom-mod-del').addEventListener('click', () => { row.remove(); saveAllCustomMods(); });
+
     return row;
   }
 
-  function addCustomModRow(btn, planetName) {
-    const list = btn.closest('.custom-mod-section').querySelector('.custom-mod-list');
-    const row = buildCustomModRow(planetName, '', 'none');
+  function addCustomModRow() {
+    const list = document.getElementById('custom-mod-list');
+    const empty = document.getElementById('custom-mod-empty');
+    if (empty) empty.remove();
+    const row = buildCustomModRow('', 'none', []);
     list.appendChild(row);
     row.querySelector('.custom-mod-text').focus();
   }
 
-  function saveCustomMods(triggerEl, planetName) {
-    const item = triggerEl.closest?.('.planet-flavor-item') ||
-                 document.querySelector(`.planet-flavor-item:has(.custom-mod-list)`);
-    // Find the item that contains this planet
-    let targetItem = null;
-    document.querySelectorAll('.planet-flavor-item').forEach(el => {
-      const ta = el.querySelector('textarea[data-key]');
-      if (ta && ta.dataset.key === planetName) targetItem = el;
-    });
-    if (!targetItem) return;
+  function saveAllCustomMods() {
     const modifiers = [];
-    targetItem.querySelectorAll('.custom-mod-row').forEach(row => {
+    document.querySelectorAll('#custom-mod-list .custom-mod-row').forEach(row => {
       const text = row.querySelector('.custom-mod-text').value.trim();
       const tier = row.querySelector('.custom-mod-tier').value;
-      if (text) modifiers.push({ text, tier });
+      const planets = [...row.querySelectorAll('.custom-planet-check input')]
+        .filter(cb => cb.checked)
+        .map(cb => cb.closest('.custom-planet-check').textContent.trim());
+      modifiers.push({ text, tier, planets });
     });
     fetch('/save_custom_modifiers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planet: planetName, modifiers }),
+      body: JSON.stringify({ modifiers }),
     });
     scheduleReformat();
   }
@@ -910,9 +1186,8 @@
     container.innerHTML = '';
     section.style.display = 'block';
 
-    const theaterFlavors   = (flavor && flavor.theaters)               ? flavor.theaters               : {};
-    const planetFlavors    = (flavor && flavor.planets)                ? flavor.planets                : {};
-    const planetCustomMods = (flavor && flavor.planet_custom_modifiers)? flavor.planet_custom_modifiers : {};
+    const theaterFlavors = (flavor && flavor.theaters) ? flavor.theaters : {};
+    const planetFlavors  = (flavor && flavor.planets)  ? flavor.planets  : {};
 
     for (const theater of theaters) {
       const faction = theater.faction;
@@ -972,37 +1247,6 @@
         const saved = planetFlavors[planet.name] || '';
         const hasText = saved.length > 0;
 
-        // Mission Modifiers section (per-planet faction checkboxes)
-        let modifiersHTML = '';
-        if (planet.modifier_options && planet.modifier_options.length > 0) {
-          const activeMods = planet.active_modifiers || {};
-          modifiersHTML = `<div class="planet-modifiers"><div class="planet-subgroup-label">Mission Modifiers</div>`;
-          for (const mod of planet.modifier_options) {
-            const isActive = mod.key in activeMods;
-            const paramVals = activeMods[mod.key] || {};
-            let paramsHTML = '';
-            for (const param of (mod.params || [])) {
-              const currentVal = paramVals[param.key] || param.options[0];
-              const opts = param.options.map(o => `<option value="${escHtml(o)}" ${currentVal === o ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
-              paramsHTML += `<span class="planet-modifier-param ${isActive ? 'visible' : ''}" data-mod="${escHtml(mod.key)}" data-param="${escHtml(param.key)}">
-                <label>${escHtml(param.label)}:</label>
-                <select onchange="handleModifierParam('${escHtml(planet.name)}', '${escHtml(mod.key)}', '${escHtml(param.key)}', this.value)">${opts}</select>
-              </span>`;
-            }
-            modifiersHTML += `<div class="planet-modifier-row">
-              <label class="planet-modifier-toggle">
-                <input type="checkbox" data-mod="${escHtml(mod.key)}" ${isActive ? 'checked' : ''}
-                  onchange="handleModifierToggle('${escHtml(planet.name)}', '${escHtml(mod.key)}', this.checked)">
-                ${escHtml(mod.label)}
-              </label>
-              ${paramsHTML}
-            </div>`;
-          }
-          modifiersHTML += '</div>';
-        }
-
-        const savedCustomMods = planetCustomMods[planet.name] || [];
-
         const item = document.createElement('div');
         item.className = 'planet-flavor-item';
         item.innerHTML = `
@@ -1012,22 +1256,7 @@
           </label>
           <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
             data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
-          <div class="custom-mod-section">
-            <div class="planet-subgroup-label" style="display:flex;align-items:center;gap:8px;margin-top:8px">
-              Custom Modifiers
-              <button class="custom-mod-add-btn" onclick="addCustomModRow(this, '${escHtml(planet.name)}')">+ Add</button>
-            </div>
-            <div class="custom-mod-list"></div>
-          </div>
-          ${modifiersHTML}
         `;
-
-        // Build existing custom modifier rows
-        const list = item.querySelector('.custom-mod-list');
-        for (const cm of savedCustomMods) {
-          list.appendChild(buildCustomModRow(planet.name, cm.text || '', cm.tier || 'none'));
-        }
-
         planetSection.appendChild(item);
       }
 
@@ -1226,6 +1455,7 @@
 
   document.getElementById('out-discord').addEventListener('input', updateCharCount);
   updateCharCount();
+  initAlertTitles();
 
   {% if outputs %}
   document.getElementById('reformat-btn').style.display = 'inline-block';
