@@ -64,6 +64,7 @@ def _load_flavor():
         data.setdefault("custom_modifiers", [])
         data.setdefault("selected_dispatches", [])
         data.setdefault("free_stratagems", [])
+        data.setdefault("excluded_theaters", [])
         data.setdefault("alert_titles", {
             "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
             "minor_order": "ALERT: MINOR ORDER UPDATE",
@@ -92,6 +93,7 @@ def _load_flavor():
         "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
         "selected_dispatches": [],
         "free_stratagems": [],
+        "excluded_theaters": [],
         "alert_titles": {
             "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
             "minor_order": "ALERT: MINOR ORDER UPDATE",
@@ -296,6 +298,22 @@ def save_limit():
         state["flavor"]["limits"][faction] = True
     else:
         state["flavor"]["limits"].pop(faction, None)
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_theater_exclude", methods=["POST"])
+def save_theater_exclude():
+    data = request.get_json()
+    faction = data.get("faction")
+    excluded = data.get("excluded")
+    if not faction or not isinstance(excluded, bool):
+        return jsonify({"status": "error", "message": "Invalid request"}), 400
+    excl_list = state["flavor"].setdefault("excluded_theaters", [])
+    if excluded and faction not in excl_list:
+        excl_list.append(faction)
+    elif not excluded and faction in excl_list:
+        excl_list.remove(faction)
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 

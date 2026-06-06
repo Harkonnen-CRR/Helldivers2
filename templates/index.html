@@ -1401,14 +1401,19 @@
       const _JS_THEATER_DISPLAY = { Terminids: 'TERMINID', Automaton: 'AUTOMATON', Illuminate: 'ILLUMINATE', Humans: 'SUPER EARTH CONTROL' };
       const theaterDisplayName = _JS_THEATER_DISPLAY[faction] || faction.toUpperCase();
       const isLimited = flavor && flavor.limits && flavor.limits[faction];
+      const isExcluded = flavor && flavor.excluded_theaters && flavor.excluded_theaters.includes(faction);
       const header = document.createElement('div');
-      header.className = 'theater-card-header';
+      header.className = 'theater-card-header' + (isExcluded ? ' theater-excluded' : '');
       header.innerHTML = `
-        <span>${theaterDisplayName} FRONT</span>
+        <span style="${isExcluded ? 'opacity:0.45;text-decoration:line-through' : ''}">${theaterDisplayName} FRONT</span>
         <span style="display:flex;align-items:center;gap:12px">
           <label onclick="event.stopPropagation()" style="font-size:11px;color:#888;font-weight:normal;cursor:pointer">
             <input type="checkbox" ${isLimited ? 'checked' : ''} onchange="saveLimit('${escHtml(faction)}', this.checked)" style="accent-color:#f0c040;cursor:pointer">
             Limit to 1 planet
+          </label>
+          <label onclick="event.stopPropagation()" style="font-size:11px;color:#888;font-weight:normal;cursor:pointer">
+            <input type="checkbox" ${isExcluded ? 'checked' : ''} onchange="saveTheaterExclude('${escHtml(faction)}', this.checked, this)" style="accent-color:#c05050;cursor:pointer">
+            Exclude from output
           </label>
           <span class="toggle-icon">▲</span>
         </span>`;
@@ -1558,6 +1563,20 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ faction, limited }),
     });
+  }
+
+  async function saveTheaterExclude(faction, excluded, checkbox) {
+    await fetch('/save_theater_exclude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faction, excluded }),
+    });
+    const header = checkbox.closest('.theater-card-header');
+    const title = header.querySelector('span:first-child');
+    header.classList.toggle('theater-excluded', excluded);
+    title.style.opacity = excluded ? '0.45' : '';
+    title.style.textDecoration = excluded ? 'line-through' : '';
+    scheduleReformat();
   }
 
   async function saveFlavor(scope, key, value) {

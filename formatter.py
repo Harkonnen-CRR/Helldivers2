@@ -522,9 +522,11 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
 
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
+    excluded = set(flavor_texts.get("excluded_theaters", []))
     for faction in theater_order:
         if limits.get(faction):
             theaters[faction] = theaters[faction][:1]
+    theater_order = [f for f in theater_order if f not in excluded]
 
     for i, faction in enumerate(theater_order):
         if i > 0:
@@ -718,9 +720,11 @@ def format_video(parsed_data, classifications, flavor_texts=None):
 
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
+    excluded = set(flavor_texts.get("excluded_theaters", []))
     for faction in theater_order:
         if limits.get(faction):
             theaters[faction] = theaters[faction][:1]
+    theater_order = [f for f in theater_order if f not in excluded]
 
     for faction in theater_order:
         lines.append(MAJOR_SEP)
