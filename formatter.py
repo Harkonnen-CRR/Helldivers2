@@ -510,9 +510,11 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                 lines.append(f"> Current HP: {int(planet['contest_health']):,}/{int(hp_max):,}")
             lines.append(f"> Players: {planet['player_count']:,}")
             if count_label == "Enemy Resistance":
-                pct = planet.get("progress_pct")
-                if pct is not None:
-                    lines.append(f"> **Enemy Resistance: {pct}%**")
+                max_h = planet.get("contest_max_health", 0)
+                regen = planet.get("regen_per_second", 0)
+                if max_h and regen:
+                    resistance = round(regen * 3600 / max_h * 100, 2)
+                    lines.append(f"> **Enemy Resistance: {resistance}%**")
             elif planet.get("campaign_level") is not None:
                 lines.append(f"> **{count_label}: {planet['campaign_level']}**")
             for mod in _FACTION_MODIFIERS.get(enemy_faction, []):
