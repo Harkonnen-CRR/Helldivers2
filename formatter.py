@@ -284,28 +284,48 @@ def _enemy_faction(planet):
     return planet["current_owner"]
 
 
+_DEFAULT_ORDER_TITLES = [
+    "PRIORITY ALERT: NEW MAJOR ORDER",
+    "PRIORITY ALERT: NEW MINOR ORDER",
+    "ALERT: STRATEGIC OPPORTUNITY IDENTIFIED",
+]
+
+
+def _get_order_title(order, index, flavor):
+    """Returns the user-selected title for an order, falling back to position-based default."""
+    labels = flavor.get("order_labels") or {}
+    saved = labels.get(str(order["id"]))
+    if saved:
+        return saved
+    if index < len(_DEFAULT_ORDER_TITLES):
+        return _DEFAULT_ORDER_TITLES[index]
+    return "ALERT: ORDER UPDATE"
+
+
+def _order_visible(order, flavor):
+    """Returns True unless the user has explicitly hidden this order."""
+    visibility = flavor.get("order_visibility") or {}
+    return visibility.get(str(order["id"]), True)
+
+
 def _get_mo_planet_indices(parsed_data):
-    mo = parsed_data.get("major_order")
-    if not mo:
-        return set()
     indices = set()
-    for task in mo.get("tasks", []):
-        if task["decoded_type"] in ("liberate_planet", "defense_planet"):
-            for vtype, val in zip(task["value_types"], task["values"]):
-                if vtype == 12:  # value type 12 = planet index in HD2 API
-                    indices.add(val)
+    for order in parsed_data.get("orders", []):
+        for task in order.get("tasks", []):
+            if task["decoded_type"] in ("liberate_planet", "defense_planet"):
+                for vtype, val in zip(task["value_types"], task["values"]):
+                    if vtype == 12:  # value type 12 = planet index in HD2 API
+                        indices.add(val)
     return indices
 
 
 def _get_mo_target_faction(parsed_data):
-    mo = parsed_data.get("major_order")
-    if not mo:
-        return None
-    for task in mo.get("tasks", []):
-        if task["decoded_type"] == "eradicate":
-            for vtype, val in zip(task["value_types"], task["values"]):
-                if vtype == 1:  # value type 1 = faction/race index
-                    return val
+    for order in parsed_data.get("orders", []):
+        for task in order.get("tasks", []):
+            if task["decoded_type"] == "eradicate":
+                for vtype, val in zip(task["value_types"], task["values"]):
+                    if vtype == 1:  # value type 1 = faction/race index
+                        return val
     return None
 
 
@@ -324,11 +344,13 @@ def _build_theaters(parsed_data):
     Within each theater, planets are sorted: MO planets first, then non-MO, both by player count desc.
     Returns (theater_order list, theaters dict).
     """
-    mo = parsed_data.get("major_order")
+    orders = parsed_data.get("orders", [])
     mo_indices = _get_mo_planet_indices(parsed_data)
     mo_target_faction = _get_mo_target_faction(parsed_data)
-    has_unknown_task = mo and any(
-        t["decoded_type"].startswith("unknown_type_") for t in mo.get("tasks", [])
+    has_unknown_task = any(
+        t["decoded_type"].startswith("unknown_type_")
+        for order in orders
+        for t in order.get("tasks", [])
     )
 
     theater_order = []
@@ -462,24 +484,29 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
     planet_flavors = flavor_texts.get("planets", {})
 
     lines = []
-    mo = parsed_data.get("major_order")
+    orders = parsed_data.get("orders", [])
     dss = parsed_data.get("dss")
     dss_planet_index = dss["planet_index"] if dss else None
 
-    if mo:
+    visible_orders = [o for o in orders if _order_visible(o, flavor_texts)]
+    manual_orders = [m for m in (flavor_texts.get("manual_orders") or []) if m.get("title", "").strip()]
+
+    if visible_orders or manual_orders:
         planet_index_to_name = _load_planet_index_to_name()
-        reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], "Medals")
-        mo_title = (flavor_texts.get("alert_titles") or {}).get("major_order", "MAJOR ORDER")
-        lines.append(f"**{mo_title}**")
-        lines.append(f"> {mo['briefing']}")
-        if mo.get('description'):
-            lines.append(f"> {mo['description']}")
-        lines.append(f"> **Reward:** {mo['reward_amount']} {reward_label}")
-        lines.append(f"> **Expires in:** {format_duration(_time_remaining_hours(mo['expiration']))}")
-        lines.append("> **Objectives:**")
         top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
         mo_task_statuses = parsed_data.get("mo_task_statuses", {})
-        for task in mo["tasks"]:
+
+    for i, order in enumerate(visible_orders):
+        reward_label = _REWARD_TYPE_MAP.get(order["reward_type"], "Medals")
+        title = _get_order_title(order, i, flavor_texts)
+        lines.append(f"**{title}**")
+        lines.append(f"> {order['briefing']}")
+        if order.get("description"):
+            lines.append(f"> {order['description']}")
+        lines.append(f"> **Reward:** {order['reward_amount']} {reward_label}")
+        lines.append(f"> **Expires in:** {format_duration(_time_remaining_hours(order['expiration']))}")
+        lines.append("> **Objectives:**")
+        for task in order["tasks"]:
             planet_idx = None
             if task["decoded_type"] in ("liberate_planet", "defense_planet"):
                 for vtype, val in zip(task["value_types"], task["values"]):
@@ -494,6 +521,10 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                     status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
                     status_info["event"] = top_p.get("event")
             lines.append(f">   • {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=True)}")
+        lines.append("")
+
+    for m in manual_orders:
+        lines.append(f"**{m['title'].strip()}**")
         lines.append("")
 
     free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
@@ -651,7 +682,7 @@ def format_video(parsed_data, classifications, flavor_texts=None):
     MINOR_SEP = "------------------------------------------------"
 
     lines = []
-    mo = parsed_data.get("major_order")
+    orders = parsed_data.get("orders", [])
     dss = parsed_data.get("dss")
     dss_planet_index = dss["planet_index"] if dss else None
 
@@ -660,21 +691,26 @@ def format_video(parsed_data, classifications, flavor_texts=None):
     lines.append(MAJOR_SEP)
     lines.append("")
 
-    if mo:
+    visible_orders = [o for o in orders if _order_visible(o, flavor_texts)]
+    manual_orders = [m for m in (flavor_texts.get("manual_orders") or []) if m.get("title", "").strip()]
+
+    if visible_orders or manual_orders:
         planet_index_to_name = _load_planet_index_to_name()
-        reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], "Medals")
-        mo_title = (flavor_texts.get("alert_titles") or {}).get("major_order", "MAJOR ORDER")
-        lines.append(mo_title)
-        lines.append(MINOR_SEP)
-        lines.append(f"    {mo['briefing']}")
-        if mo.get('description'):
-            lines.append(f"    {mo['description']}")
-        lines.append(f"    Reward: {mo['reward_amount']} {reward_label}")
-        lines.append(f"    Expires in: {format_duration(_time_remaining_hours(mo['expiration']))}")
-        lines.append("    Objectives:")
         top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
         mo_task_statuses = parsed_data.get("mo_task_statuses", {})
-        for task in mo["tasks"]:
+
+    for i, order in enumerate(visible_orders):
+        reward_label = _REWARD_TYPE_MAP.get(order["reward_type"], "Medals")
+        title = _get_order_title(order, i, flavor_texts)
+        lines.append(title)
+        lines.append(MINOR_SEP)
+        lines.append(f"    {order['briefing']}")
+        if order.get("description"):
+            lines.append(f"    {order['description']}")
+        lines.append(f"    Reward: {order['reward_amount']} {reward_label}")
+        lines.append(f"    Expires in: {format_duration(_time_remaining_hours(order['expiration']))}")
+        lines.append("    Objectives:")
+        for task in order["tasks"]:
             planet_idx = None
             if task["decoded_type"] in ("liberate_planet", "defense_planet"):
                 for vtype, val in zip(task["value_types"], task["values"]):
@@ -689,6 +725,11 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                     status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
                     status_info["event"] = top_p.get("event")
             lines.append(f"      - {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=False)}")
+        lines.append("")
+
+    for m in manual_orders:
+        lines.append(m["title"].strip())
+        lines.append(MINOR_SEP)
         lines.append("")
 
     free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
@@ -842,14 +883,15 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
     for faction in theater_order:
         if limits.get(faction):
             theaters[faction] = theaters[faction][:1]
-    mo = parsed_data.get("major_order")
+    orders = parsed_data.get("orders", [])
     dss = parsed_data.get("dss")
     mo_indices = _get_mo_planet_indices(parsed_data)
 
     mo_task_labels = []
-    if mo:
+    if orders:
         planet_index_to_name = _load_planet_index_to_name()
-        mo_task_labels = [_render_task_label(t, planet_index_to_name) for t in mo.get("tasks", [])]
+        for order in orders:
+            mo_task_labels.extend([_render_task_label(t, planet_index_to_name) for t in order.get("tasks", [])])
 
     result = []
     for faction in theater_order:
@@ -903,12 +945,13 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
             })
 
         mo_ref = None
-        if mo and mo_relevant:
-            reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], "Unknown")
+        if orders and mo_relevant:
+            first_order = orders[0]
+            reward_label = _REWARD_TYPE_MAP.get(first_order["reward_type"], "Medals")
             mo_ref = {
-                "briefing": mo["briefing"],
-                "reward": f"{mo['reward_amount']} {reward_label}",
-                "expires": format_duration(_time_remaining_hours(mo["expiration"])),
+                "briefing": first_order["briefing"],
+                "reward": f"{first_order['reward_amount']} {reward_label}",
+                "expires": format_duration(_time_remaining_hours(first_order["expiration"])),
                 "tasks": mo_task_labels,
             }
 

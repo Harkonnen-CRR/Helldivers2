@@ -23,11 +23,9 @@ _SESSION_DEFAULTS = {
     "excluded_theaters": [],
     "selected_dispatches": [],
     "free_stratagems": [],
-    "alert_titles": {
-        "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
-        "minor_order": "ALERT: MINOR ORDER UPDATE",
-        "strategic_opportunity": "ALERT: STRATEGIC OPPORTUNITY",
-    },
+    "order_labels": {},       # {str(assignment_id): title string}
+    "order_visibility": {},   # {str(assignment_id): bool} — True by default
+    "manual_orders": [],      # [{title: str}] for header-only manual entries
 }
 
 state = {
@@ -140,7 +138,6 @@ def index():
         "index.html",
         classifications=state["classifications"],
         outputs=state["last_outputs"],
-        alert_titles=state["session"].get("alert_titles", {}),
     )
 
 
@@ -193,6 +190,7 @@ def refresh():
         "theaters": theaters,
         "modifier_panel": modifier_panel,
         "dispatches": parsed.get("dispatches", []),
+        "orders": parsed.get("orders", []),
         "flavor": merged,
     })
 
@@ -253,6 +251,7 @@ def fetch2():
         "theaters": theaters,
         "modifier_panel": modifier_panel,
         "dispatches": parsed.get("dispatches", []),
+        "orders": parsed.get("orders", []),
         "flavor": merged,
     })
 
@@ -288,20 +287,48 @@ def save_flavor():
     scope = data.get("scope")
     key = data.get("key")
     value = data.get("value", "")
-    if scope not in ("theaters", "planets", "planet_notes", "alert_titles") or not key:
+    if scope not in ("theaters", "planets", "planet_notes") or not key:
         return jsonify({"status": "error", "message": "Invalid scope or key"}), 400
-    if scope == "alert_titles":
-        # alert_titles are session-only — update in memory, never write to disk
-        if value:
-            state["session"]["alert_titles"][key] = value
-        else:
-            state["session"]["alert_titles"][key] = _SESSION_DEFAULTS["alert_titles"].get(key, "")
-        return jsonify({"status": "ok"})
     if value:
         state["flavor"][scope][key] = value
     else:
         state["flavor"][scope].pop(key, None)
     _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_order_label", methods=["POST"])
+def save_order_label():
+    data = request.get_json()
+    order_id = data.get("id")
+    title = data.get("title", "").strip()
+    if not order_id:
+        return jsonify({"status": "error", "message": "Missing id"}), 400
+    if title:
+        state["session"]["order_labels"][str(order_id)] = title
+    else:
+        state["session"]["order_labels"].pop(str(order_id), None)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_order_visibility", methods=["POST"])
+def save_order_visibility():
+    data = request.get_json()
+    order_id = data.get("id")
+    visible = data.get("visible", True)
+    if not order_id:
+        return jsonify({"status": "error", "message": "Missing id"}), 400
+    state["session"]["order_visibility"][str(order_id)] = bool(visible)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_manual_orders", methods=["POST"])
+def save_manual_orders():
+    data = request.get_json()
+    orders = data.get("orders", [])
+    state["session"]["manual_orders"] = [
+        m for m in orders if isinstance(m, dict) and m.get("title", "").strip()
+    ]
     return jsonify({"status": "ok"})
 
 

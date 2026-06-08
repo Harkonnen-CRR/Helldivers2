@@ -101,62 +101,60 @@ def _build_planet(planet, campaigns_by_index):
 
 
 def _build_mo_task_statuses(assignments, planets_data, campaigns_by_index):
-    """Returns {planet_index: {type, progress_pct}} for each planet-linked MO task."""
+    """Returns {planet_index: {type, progress_pct}} for planet-linked tasks across all orders."""
     if not assignments:
         return {}
-    a = assignments[0]
     planet_by_index = {p["index"]: p for p in planets_data}
     statuses = {}
-    progress = a.get("progress") or []
 
-    for i, t in enumerate(a.get("tasks", [])):
-        decoded = _TASK_TYPE_MAP.get(t["type"], "")
-        if decoded not in ("liberate_planet", "defense_planet"):
-            continue
+    for a in assignments:
+        progress = a.get("progress") or []
+        for i, t in enumerate(a.get("tasks", [])):
+            decoded = _TASK_TYPE_MAP.get(t["type"], "")
+            if decoded not in ("liberate_planet", "defense_planet"):
+                continue
 
-        planet_idx = None
-        for vtype, val in zip(t.get("valueTypes", []), t.get("values", [])):
-            if vtype == 12:
-                planet_idx = val
-                break
-        if planet_idx is None:
-            continue
+            planet_idx = None
+            for vtype, val in zip(t.get("valueTypes", []), t.get("values", [])):
+                if vtype == 12:
+                    planet_idx = val
+                    break
+            if planet_idx is None:
+                continue
 
-        task_progress = progress[i] if i < len(progress) else None
-        if task_progress is not None and task_progress >= 1:
-            statuses[planet_idx] = {"type": "secure"}
-            continue
+            task_progress = progress[i] if i < len(progress) else None
+            if task_progress is not None and task_progress >= 1:
+                statuses[planet_idx] = {"type": "secure"}
+                continue
 
-        planet = planet_by_index.get(planet_idx)
-        if not planet:
-            continue
+            planet = planet_by_index.get(planet_idx)
+            if not planet:
+                continue
 
-        campaign = campaigns_by_index.get(planet_idx)
-        event = planet.get("event")
-        is_defense = event is not None and event.get("eventType") == 1
+            campaign = campaigns_by_index.get(planet_idx)
+            event = planet.get("event")
+            is_defense = event is not None and event.get("eventType") == 1
 
-        if planet.get("currentOwner") == "Humans" and not campaign:
-            statuses[planet_idx] = {"type": "secure"}
-        elif is_defense:
-            health = event["health"]
-            max_health = event["maxHealth"]
-            pct = round((1 - health / max_health) * 100, 2) if max_health else 0.0
-            statuses[planet_idx] = {"type": "defense", "progress_pct": pct}
-        elif campaign:
-            health = planet["health"]
-            max_health = planet["maxHealth"]
-            pct = round((1 - health / max_health) * 100, 2) if max_health else 0.0
-            statuses[planet_idx] = {"type": "liberation", "progress_pct": pct}
-        else:
-            statuses[planet_idx] = {"type": "not_started"}
+            if planet.get("currentOwner") == "Humans" and not campaign:
+                statuses[planet_idx] = {"type": "secure"}
+            elif is_defense:
+                health = event["health"]
+                max_health = event["maxHealth"]
+                pct = round((1 - health / max_health) * 100, 2) if max_health else 0.0
+                statuses[planet_idx] = {"type": "defense", "progress_pct": pct}
+            elif campaign:
+                health = planet["health"]
+                max_health = planet["maxHealth"]
+                pct = round((1 - health / max_health) * 100, 2) if max_health else 0.0
+                statuses[planet_idx] = {"type": "liberation", "progress_pct": pct}
+            else:
+                statuses[planet_idx] = {"type": "not_started"}
 
     return statuses
 
 
-def _build_major_order(assignments):
-    if not assignments:
-        return None
-    a = assignments[0]
+def _build_order(a):
+    """Builds a single order dict from one assignment entry."""
     reward = a.get("reward", {})
     tasks = []
     for t in a.get("tasks", []):
@@ -178,6 +176,11 @@ def _build_major_order(assignments):
         "tasks": tasks,
         "progress": a.get("progress"),
     }
+
+
+def _build_orders(assignments):
+    """Returns a list of order dicts, one per assignment."""
+    return [_build_order(a) for a in assignments] if assignments else []
 
 
 def _build_dss(dss_data):
@@ -277,7 +280,7 @@ def parse_all():
 
     return {
         "planets": planets,
-        "major_order": _build_major_order(assignments_data),
+        "orders": _build_orders(assignments_data),
         "mo_task_statuses": _build_mo_task_statuses(assignments_data, planets_data, campaigns_by_index),
         "dss": _build_dss(dss_data),
         "dispatches": _build_dispatches(dispatches_data),

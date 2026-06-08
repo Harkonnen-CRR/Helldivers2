@@ -489,25 +489,35 @@
     input.strat-name:focus { outline: none; border-color: #444; }
     input.strat-name::placeholder { color: #3a3a3a; }
 
-    /* Alert titles section */
-    .alert-title-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 7px 0; border-bottom: 1px solid #1a1a1a; flex-wrap: wrap;
+    /* Orders panel */
+    .order-block {
+      background: #0a0f0a; border: 1px solid #1a2a1a; border-radius: 4px;
+      padding: 8px 10px; margin-bottom: 8px;
     }
-    .alert-title-row:last-child { border-bottom: none; }
-    .alert-title-label { color: #888; font-size: 12px; min-width: 160px; }
-    select.alert-title-select {
-      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
-      color: #c8c8c8; font-family: 'Courier New', monospace; font-size: 12px;
-      padding: 4px 6px; cursor: pointer; width: auto;
+    .order-block-manual { border-color: #2a2a1a; background: #0f0f0a; }
+    .order-block-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
     }
-    select.alert-title-select:focus { outline: none; border-color: #444; }
-    input.alert-title-custom {
-      background: #111; border: 1px solid #3a3a00; border-radius: 3px;
-      color: #f0c040; font-family: 'Courier New', monospace; font-size: 12px;
-      padding: 4px 7px; flex: 1; min-width: 200px;
+    select.order-title-select {
+      flex: 1; background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace; font-size: 11px;
+      padding: 3px 5px; cursor: pointer;
     }
-    input.alert-title-custom:focus { outline: none; border-color: #666600; }
+    .order-show-toggle {
+      display: flex; align-items: center; gap: 4px; font-size: 11px;
+      color: #888; white-space: nowrap; cursor: pointer;
+    }
+    input.order-custom-input {
+      width: 100%; box-sizing: border-box; background: #111; border: 1px solid #3a3a00;
+      border-radius: 3px; color: #f0c040; font-family: 'Courier New', monospace;
+      font-size: 11px; padding: 4px 7px; margin-bottom: 4px;
+    }
+    .order-preview {
+      padding: 5px 8px; background: #060a06; border-radius: 3px;
+      border-left: 2px solid #1a3a1a;
+    }
+    .order-preview-briefing { font-size: 11px; color: #999; margin-bottom: 2px; }
+    .order-preview-meta { font-size: 10px; color: #555; }
 
     /* Dispatches panel */
     .dispatch-card {
@@ -608,52 +618,17 @@
     </div>
   </div>
 
-  <!-- Alert Titles Section -->
-  <div class="section" id="alert-titles-section">
-    <div class="modifiers-header" onclick="toggleSection('alert-titles-body', 'alert-titles-icon')">
-      <h3 style="margin:0">Alert Titles</h3>
-      <span class="toggle-icon" id="alert-titles-icon">▲</span>
+  <!-- Orders Section -->
+  <div class="section" id="orders-section">
+    <div class="modifiers-header" onclick="toggleSection('orders-body', 'orders-icon')">
+      <h3 style="margin:0">Orders</h3>
+      <span class="toggle-icon" id="orders-icon">▲</span>
     </div>
-    <div id="alert-titles-body">
-
-      <div class="alert-title-row">
-        <span class="alert-title-label">Major Order</span>
-        <select class="alert-title-select" data-section="major_order" onchange="handleAlertSelect(this)">
-          <option value="PRIORITY ALERT: NEW MAJOR ORDER">PRIORITY ALERT: NEW MAJOR ORDER</option>
-          <option value="PRIORITY ALERT: MAJOR ORDER WON">PRIORITY ALERT: MAJOR ORDER WON</option>
-          <option value="PRIORITY ALERT: MAJOR ORDER LOST">PRIORITY ALERT: MAJOR ORDER LOST</option>
-          <option value="ALERT: MAJOR ORDER UPDATE">ALERT: MAJOR ORDER UPDATE</option>
-          <option value="ALERT: GALACTIC WAR UPDATE">ALERT: GALACTIC WAR UPDATE</option>
-          <option value="__pa_custom__">PRIORITY ALERT: Custom...</option>
-          <option value="__al_custom__">ALERT: Custom...</option>
-        </select>
-        <input type="text" class="alert-title-custom" data-section="major_order" placeholder="type full title..." style="display:none">
+    <div id="orders-body">
+      <div id="orders-list">
+        <div class="no-hazards">Run Refresh to load active orders.</div>
       </div>
-
-      <div class="alert-title-row">
-        <span class="alert-title-label">Minor Order</span>
-        <select class="alert-title-select" data-section="minor_order" onchange="handleAlertSelect(this)">
-          <option value="PRIORITY ALERT: NEW MINOR ORDER">PRIORITY ALERT: NEW MINOR ORDER</option>
-          <option value="ALERT: MINOR ORDER UPDATE">ALERT: MINOR ORDER UPDATE</option>
-          <option value="ALERT: MINOR ORDER COMPLETE">ALERT: MINOR ORDER COMPLETE</option>
-          <option value="ALERT: MINOR ORDER LOST">ALERT: MINOR ORDER LOST</option>
-          <option value="__al_custom__">ALERT: Custom...</option>
-        </select>
-        <input type="text" class="alert-title-custom" data-section="minor_order" placeholder="type full title..." style="display:none">
-      </div>
-
-      <div class="alert-title-row">
-        <span class="alert-title-label">Strategic Opportunity</span>
-        <select class="alert-title-select" data-section="strategic_opportunity" onchange="handleAlertSelect(this)">
-          <option value="ALERT: STRATEGIC OPPORTUNITY IDENTIFIED">ALERT: STRATEGIC OPPORTUNITY IDENTIFIED</option>
-          <option value="ALERT: STRATEGIC OPPORTUNITY UPDATE">ALERT: STRATEGIC OPPORTUNITY UPDATE</option>
-          <option value="ALERT: STRATEGIC OPPORTUNITY SEIZED">ALERT: STRATEGIC OPPORTUNITY SEIZED</option>
-          <option value="ALERT: STRATEGIC OPPORTUNITY MISSED">ALERT: STRATEGIC OPPORTUNITY MISSED</option>
-          <option value="__al_custom__">ALERT: Custom...</option>
-        </select>
-        <input type="text" class="alert-title-custom" data-section="strategic_opportunity" placeholder="type full title..." style="display:none">
-      </div>
-
+      <button class="mod-add-btn" onclick="addManualOrder()" style="margin-top:6px">+ Add Manual Header</button>
     </div>
   </div>
 
@@ -746,7 +721,6 @@
 <script>
   const COUNTDOWN = 60;
   let countdownInterval = null;
-  const _savedAlertTitles = {{ alert_titles | tojson }};
 
   // Search state per output panel
   const searchState = {
@@ -793,6 +767,7 @@
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
+    buildOrdersPanel(data.orders || [], data.flavor);
     buildFlavorEditor(data.theaters, data.flavor);
     startCountdown();
   }
@@ -853,6 +828,7 @@
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
+    buildOrdersPanel(data.orders || [], data.flavor);
     buildFlavorEditor(data.theaters, data.flavor);
   }
 
@@ -1010,63 +986,183 @@
 
   function toggleModifiersPanel() { toggleSection('modifiers-body', 'modifiers-toggle-icon'); }
 
-  // ── Alert Titles ──────────────────────────────────────────────
+  // ── Orders Panel ─────────────────────────────────────────────
 
-  function handleAlertSelect(sel) {
-    const section = sel.dataset.section;
-    const row = sel.closest('.alert-title-row');
-    const input = row.querySelector('.alert-title-custom');
-    const val = sel.value;
-    if (val === '__pa_custom__') {
-      input.style.display = 'inline-block';
-      if (!input.value) input.value = 'PRIORITY ALERT: ';
-      input.focus();
-    } else if (val === '__al_custom__') {
-      input.style.display = 'inline-block';
-      if (!input.value) input.value = 'ALERT: ';
-      input.focus();
-    } else {
-      input.style.display = 'none';
-      saveAlertTitle(section, val);
+  const ORDER_TITLE_PRESETS = [
+    "PRIORITY ALERT: NEW MAJOR ORDER",
+    "PRIORITY ALERT: MAJOR ORDER WON",
+    "PRIORITY ALERT: MAJOR ORDER LOST",
+    "ALERT: MAJOR ORDER UPDATE",
+    "ALERT: GALACTIC WAR UPDATE",
+    "PRIORITY ALERT: NEW MINOR ORDER",
+    "ALERT: MINOR ORDER UPDATE",
+    "ALERT: MINOR ORDER COMPLETE",
+    "ALERT: MINOR ORDER LOST",
+    "ALERT: STRATEGIC OPPORTUNITY IDENTIFIED",
+    "ALERT: STRATEGIC OPPORTUNITY UPDATE",
+    "ALERT: STRATEGIC OPPORTUNITY SEIZED",
+    "ALERT: STRATEGIC OPPORTUNITY MISSED",
+  ];
+
+  const DEFAULT_ORDER_TITLES = [
+    "PRIORITY ALERT: NEW MAJOR ORDER",
+    "PRIORITY ALERT: NEW MINOR ORDER",
+    "ALERT: STRATEGIC OPPORTUNITY IDENTIFIED",
+  ];
+
+  let _ordersData = [];
+
+  function buildOrdersPanel(orders, flavor) {
+    _ordersData = orders || [];
+    const list = document.getElementById('orders-list');
+    list.innerHTML = '';
+    const orderLabels = (flavor && flavor.order_labels) || {};
+    const orderVisibility = (flavor && flavor.order_visibility) || {};
+    const manualOrders = (flavor && flavor.manual_orders) || [];
+
+    if (_ordersData.length === 0 && manualOrders.length === 0) {
+      list.innerHTML = '<div class="no-hazards">No active orders — run Refresh to load.</div>';
+      return;
     }
+
+    _ordersData.forEach((order, i) => {
+      const savedLabel = orderLabels[String(order.id)];
+      const visible = orderVisibility[String(order.id)] !== false;
+      list.appendChild(buildOrderBlock(order, i, savedLabel, visible));
+    });
+
+    manualOrders.forEach((m, i) => {
+      list.appendChild(buildManualOrderBlock(m, i));
+    });
   }
 
-  function saveAlertTitle(section, value) {
-    fetch('/save_flavor', {
+  function _orderTitleOptions(currentLabel) {
+    const isPreset = ORDER_TITLE_PRESETS.includes(currentLabel);
+    let html = ORDER_TITLE_PRESETS.map(t =>
+      `<option value="${escHtml(t)}" ${t === currentLabel ? 'selected' : ''}>${escHtml(t)}</option>`
+    ).join('');
+    html += `<option value="__custom__" ${!isPreset && currentLabel ? 'selected' : ''}>Custom...</option>`;
+    return html;
+  }
+
+  function _expiryPreview(expiryStr) {
+    try {
+      const ms = new Date(expiryStr) - new Date();
+      if (ms <= 0) return 'imminent';
+      const totalMins = Math.floor(ms / 60000);
+      const days = Math.floor(totalMins / 1440);
+      const hrs = Math.floor((totalMins % 1440) / 60);
+      const mins = totalMins % 60;
+      const parts = [];
+      if (days) parts.push(days + 'd');
+      if (hrs) parts.push(hrs + 'hr');
+      if (mins || !parts.length) parts.push(mins + 'min');
+      return parts.join(' ');
+    } catch (e) { return ''; }
+  }
+
+  function buildOrderBlock(order, index, savedLabel, visible) {
+    const defaultTitle = DEFAULT_ORDER_TITLES[index] || 'ALERT: ORDER UPDATE';
+    const currentLabel = savedLabel || defaultTitle;
+    const isCustom = !ORDER_TITLE_PRESETS.includes(currentLabel);
+
+    const div = document.createElement('div');
+    div.className = 'order-block';
+    div.dataset.orderId = String(order.id);
+
+    const expiryStr = order.expiration ? `Expires: ${_expiryPreview(order.expiration)}` : '';
+    const rewardStr = order.reward_amount != null ? `Reward: ${order.reward_amount} Medals` : '';
+    const meta = [rewardStr, expiryStr].filter(Boolean).join('  |  ');
+
+    div.innerHTML = `
+      <div class="order-block-header">
+        <select class="order-title-select">${_orderTitleOptions(currentLabel)}</select>
+        <label class="order-show-toggle"><input type="checkbox" class="order-visible-cb" ${visible ? 'checked' : ''}> Show</label>
+      </div>
+      <input type="text" class="order-custom-input" placeholder="Custom title..." value="${isCustom ? escHtml(currentLabel) : ''}" style="display:${isCustom ? 'block' : 'none'}">
+      <div class="order-preview">
+        <div class="order-preview-briefing">${escHtml(order.briefing || '')}</div>
+        ${meta ? `<div class="order-preview-meta">${escHtml(meta)}</div>` : ''}
+      </div>`;
+
+    const sel = div.querySelector('.order-title-select');
+    const customInput = div.querySelector('.order-custom-input');
+    const visibleCb = div.querySelector('.order-visible-cb');
+
+    sel.addEventListener('change', () => {
+      if (sel.value === '__custom__') {
+        customInput.style.display = 'block';
+        customInput.focus();
+      } else {
+        customInput.style.display = 'none';
+        saveOrderLabel(order.id, sel.value);
+      }
+    });
+    customInput.addEventListener('input', () => {
+      if (customInput.value.trim()) saveOrderLabel(order.id, customInput.value.trim());
+    });
+    visibleCb.addEventListener('change', () => saveOrderVisibility(order.id, visibleCb.checked));
+
+    return div;
+  }
+
+  function buildManualOrderBlock(manual, index) {
+    const div = document.createElement('div');
+    div.className = 'order-block order-block-manual';
+    div.innerHTML = `
+      <div class="order-block-header">
+        <span style="color:#666;font-size:11px;font-family:'Courier New',monospace">Manual Header</span>
+        <button class="custom-mod-del order-manual-del">×</button>
+      </div>
+      <input type="text" class="order-custom-input" placeholder="e.g. ALERT: GALACTIC WAR UPDATE" value="${escHtml(manual.title || '')}">`;
+    div.querySelector('.order-custom-input').addEventListener('input', saveAllManualOrders);
+    div.querySelector('.order-manual-del').addEventListener('click', () => {
+      div.remove();
+      saveAllManualOrders();
+    });
+    return div;
+  }
+
+  function saveOrderLabel(orderId, title) {
+    fetch('/save_order_label', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scope: 'alert_titles', key: section, value }),
+      body: JSON.stringify({ id: String(orderId), title }),
     });
     scheduleReformat();
   }
 
-  function initAlertTitles() {
-    document.querySelectorAll('.alert-title-row').forEach(row => {
-      const section = row.querySelector('.alert-title-select').dataset.section;
-      const sel = row.querySelector('.alert-title-select');
-      const input = row.querySelector('.alert-title-custom');
-      const saved = (_savedAlertTitles && _savedAlertTitles[section]) || '';
-      if (!saved) return;
-      const preset = [...sel.options].find(o => o.value === saved);
-      if (preset) {
-        sel.value = saved;
-      } else if (saved.startsWith('PRIORITY ALERT:')) {
-        sel.value = '__pa_custom__';
-        input.value = saved;
-        input.style.display = 'inline-block';
-      } else {
-        sel.value = '__al_custom__';
-        input.value = saved;
-        input.style.display = 'inline-block';
-      }
+  function saveOrderVisibility(orderId, visible) {
+    fetch('/save_order_visibility', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: String(orderId), visible }),
     });
-    // Wire custom inputs to auto-save
-    document.querySelectorAll('.alert-title-custom').forEach(inp => {
-      inp.addEventListener('input', () => saveAlertTitle(inp.dataset.section, inp.value));
-    });
+    scheduleReformat();
   }
 
+  function addManualOrder() {
+    const list = document.getElementById('orders-list');
+    const empty = list.querySelector('.no-hazards');
+    if (empty) empty.remove();
+    const block = buildManualOrderBlock({ title: '' }, list.querySelectorAll('.order-block-manual').length);
+    list.appendChild(block);
+    block.querySelector('.order-custom-input').focus();
+  }
 
+  function saveAllManualOrders() {
+    const orders = [];
+    document.querySelectorAll('#orders-list .order-block-manual').forEach(div => {
+      const title = div.querySelector('.order-custom-input').value.trim();
+      if (title) orders.push({ title });
+    });
+    fetch('/save_manual_orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orders }),
+    });
+    scheduleReformat();
+  }
 
   // ── Modifier panel (Special Factions + Custom Modifiers) ─────
 
@@ -1684,7 +1780,6 @@
 
   document.getElementById('out-discord').addEventListener('input', updateCharCount);
   updateCharCount();
-  initAlertTitles();
   startRefresh();
 
   {% if outputs %}
