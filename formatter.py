@@ -221,9 +221,10 @@ def _format_region_status(region):
     if lib_time is None:
         return "Calculating..."
     duration = format_duration(lib_time)
+    region_type = region.get("size") or "Region"
     if region.get("region_losing"):
-        return f"Region Lost in: {duration}"
-    return f"Region Secured in: {duration}"
+        return f"{region_type} Lost in: {duration}"
+    return f"{region_type} Secured in: {duration}"
 
 
 # FUTURE: replace with classify_items_web() for web UI, same input/output shape
