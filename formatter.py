@@ -4,10 +4,10 @@ import re
 from datetime import datetime, timezone
 
 
+# type 0 = Medals confirmed; Cape seen in the wild but type number unverified
+# TODO: add Cape once we see its type number in live MO data
 _REWARD_TYPE_MAP = {
     0: "Medals",
-    1: "Super Credits",
-    2: "Requisition Slips",
 }
 
 _FACTION_MAP = {
@@ -468,7 +468,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
 
     if mo:
         planet_index_to_name = _load_planet_index_to_name()
-        reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], f"Unknown (type {mo['reward_type']})")
+        reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], "Medals")
         mo_title = (flavor_texts.get("alert_titles") or {}).get("major_order", "MAJOR ORDER")
         lines.append(f"**{mo_title}**")
         lines.append(f"> {mo['briefing']}")
@@ -662,7 +662,7 @@ def format_video(parsed_data, classifications, flavor_texts=None):
 
     if mo:
         planet_index_to_name = _load_planet_index_to_name()
-        reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], f"Unknown (type {mo['reward_type']})")
+        reward_label = _REWARD_TYPE_MAP.get(mo["reward_type"], "Medals")
         mo_title = (flavor_texts.get("alert_titles") or {}).get("major_order", "MAJOR ORDER")
         lines.append(mo_title)
         lines.append(MINOR_SEP)
