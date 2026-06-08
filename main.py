@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 from datetime import datetime
@@ -13,14 +14,36 @@ app = Flask(__name__)
 CLASSIFICATIONS_PATH = "data/classifications.json"
 FLAVOR_PATH = "data/flavor.json"
 
+# Keys stored in flavor.json and loaded across sessions
+_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers"}
+
+# Session-only defaults — reset on every page load, never written to disk
+_SESSION_DEFAULTS = {
+    "limits": {},
+    "excluded_theaters": [],
+    "selected_dispatches": [],
+    "free_stratagems": [],
+    "alert_titles": {
+        "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
+        "minor_order": "ALERT: MINOR ORDER UPDATE",
+        "strategic_opportunity": "ALERT: STRATEGIC OPPORTUNITY",
+    },
+}
+
 state = {
     "snapshot1_health": {},
     "snapshot1_time": None,
     "classifications": {},
     "flavor": {},
+    "session": copy.deepcopy(_SESSION_DEFAULTS),
     "last_parsed": None,
     "last_outputs": None,
 }
+
+
+def _merged_flavor():
+    """Returns persistent flavor merged with current session state for formatter use."""
+    return {**state["flavor"], **state["session"]}
 
 
 def _api_error_type(status_code):
@@ -50,26 +73,19 @@ def _save_classifications(classifications):
         json.dump(classifications, f, indent=2)
 
 
-
 def _load_flavor():
+    """Loads only persistent flavor keys from disk. Session keys are ignored."""
+    defaults = {
+        "theaters": {}, "planets": {}, "planet_notes": {},
+        "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
+    }
     if os.path.exists(FLAVOR_PATH):
         with open(FLAVOR_PATH) as f:
             data = json.load(f)
-        data.setdefault("theaters", {})
-        data.setdefault("planets", {})
-        data.setdefault("limits", {})
-        data.setdefault("planet_notes", {})
-        data.setdefault("planet_tags", {})
-        data.setdefault("planet_modifiers", {})
-        data.setdefault("custom_modifiers", [])
-        data.setdefault("selected_dispatches", [])
-        data.setdefault("free_stratagems", [])
-        data.setdefault("excluded_theaters", [])
-        data.setdefault("alert_titles", {
-            "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
-            "minor_order": "ALERT: MINOR ORDER UPDATE",
-            "strategic_opportunity": "ALERT: STRATEGIC OPPORTUNITY",
-        })
+        # Strip any session keys that may exist in older flavor.json files
+        data = {k: v for k, v in data.items() if k in _PERSISTENT_KEYS}
+        for k, v in defaults.items():
+            data.setdefault(k, v)
         # Migrate old planet_custom_modifiers (per-planet list) into new flat list
         old = data.pop("planet_custom_modifiers", {})
         if old and not data["custom_modifiers"]:
@@ -88,24 +104,15 @@ def _load_flavor():
                     seen[key]["planets"].append(planet_name)
             data["custom_modifiers"] = list(seen.values())
         return data
-    return {
-        "theaters": {}, "planets": {}, "limits": {}, "planet_notes": {},
-        "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
-        "selected_dispatches": [],
-        "free_stratagems": [],
-        "excluded_theaters": [],
-        "alert_titles": {
-            "major_order": "PRIORITY ALERT: NEW MAJOR ORDER",
-            "minor_order": "ALERT: MINOR ORDER UPDATE",
-            "strategic_opportunity": "ALERT: STRATEGIC OPPORTUNITY",
-        },
-    }
+    return defaults
 
 
 def _save_flavor(flavor):
+    """Writes only persistent keys to disk."""
     os.makedirs("data", exist_ok=True)
+    persistent = {k: v for k, v in flavor.items() if k in _PERSISTENT_KEYS}
     with open(FLAVOR_PATH, "w") as f:
-        json.dump(flavor, f, indent=2)
+        json.dump(persistent, f, indent=2)
 
 
 def _get_classification_items(raw_planets):
@@ -128,11 +135,12 @@ def _get_classification_items(raw_planets):
 def index():
     state["classifications"] = _load_classifications()
     state["flavor"] = _load_flavor()
+    state["session"] = copy.deepcopy(_SESSION_DEFAULTS)  # reset session on every page load
     return render_template(
         "index.html",
         classifications=state["classifications"],
         outputs=state["last_outputs"],
-        alert_titles=state["flavor"].get("alert_titles", {}),
+        alert_titles=state["session"].get("alert_titles", {}),
     )
 
 
@@ -175,8 +183,9 @@ def refresh():
         for key, item in items.items()
     }
 
-    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"], state["flavor"].get("planet_modifiers", {}))
-    modifier_panel = get_modifier_panel_data(parsed, state["flavor"])
+    merged = _merged_flavor()
+    theaters = get_theater_data(parsed, merged.get("limits", {}), state["classifications"], merged.get("planet_modifiers", {}))
+    modifier_panel = get_modifier_panel_data(parsed, merged)
 
     return jsonify({
         "status": "ok",
@@ -184,7 +193,7 @@ def refresh():
         "theaters": theaters,
         "modifier_panel": modifier_panel,
         "dispatches": parsed.get("dispatches", []),
-        "flavor": state["flavor"],
+        "flavor": merged,
     })
 
 
@@ -230,10 +239,11 @@ def fetch2():
                         region["region_losing"] = True
 
     state["last_parsed"] = parsed
-    theaters = get_theater_data(parsed, state["flavor"].get("limits", {}), state["classifications"], state["flavor"].get("planet_modifiers", {}))
-    modifier_panel = get_modifier_panel_data(parsed, state["flavor"])
-    discord_text = format_discord(parsed, state["classifications"], state["flavor"])
-    video_text = format_video(parsed, state["classifications"], state["flavor"])
+    merged = _merged_flavor()
+    theaters = get_theater_data(parsed, merged.get("limits", {}), state["classifications"], merged.get("planet_modifiers", {}))
+    modifier_panel = get_modifier_panel_data(parsed, merged)
+    discord_text = format_discord(parsed, state["classifications"], merged)
+    video_text = format_video(parsed, state["classifications"], merged)
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
 
     return jsonify({
@@ -243,7 +253,7 @@ def fetch2():
         "theaters": theaters,
         "modifier_panel": modifier_panel,
         "dispatches": parsed.get("dispatches", []),
-        "flavor": state["flavor"],
+        "flavor": merged,
     })
 
 
@@ -251,8 +261,9 @@ def fetch2():
 def reformat():
     if state["last_parsed"] is None:
         return jsonify({"status": "error", "message": "No data — run Refresh first"}), 400
-    discord_text = format_discord(state["last_parsed"], state["classifications"], state["flavor"])
-    video_text = format_video(state["last_parsed"], state["classifications"], state["flavor"])
+    merged = _merged_flavor()
+    discord_text = format_discord(state["last_parsed"], state["classifications"], merged)
+    video_text = format_video(state["last_parsed"], state["classifications"], merged)
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
     return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
 
@@ -279,6 +290,13 @@ def save_flavor():
     value = data.get("value", "")
     if scope not in ("theaters", "planets", "planet_notes", "alert_titles") or not key:
         return jsonify({"status": "error", "message": "Invalid scope or key"}), 400
+    if scope == "alert_titles":
+        # alert_titles are session-only — update in memory, never write to disk
+        if value:
+            state["session"]["alert_titles"][key] = value
+        else:
+            state["session"]["alert_titles"][key] = _SESSION_DEFAULTS["alert_titles"].get(key, "")
+        return jsonify({"status": "ok"})
     if value:
         state["flavor"][scope][key] = value
     else:
@@ -295,10 +313,9 @@ def save_limit():
     if not faction or not isinstance(limited, bool):
         return jsonify({"status": "error", "message": "Invalid request"}), 400
     if limited:
-        state["flavor"]["limits"][faction] = True
+        state["session"]["limits"][faction] = True
     else:
-        state["flavor"]["limits"].pop(faction, None)
-    _save_flavor(state["flavor"])
+        state["session"]["limits"].pop(faction, None)
     return jsonify({"status": "ok"})
 
 
@@ -309,12 +326,11 @@ def save_theater_exclude():
     excluded = data.get("excluded")
     if not faction or not isinstance(excluded, bool):
         return jsonify({"status": "error", "message": "Invalid request"}), 400
-    excl_list = state["flavor"].setdefault("excluded_theaters", [])
+    excl_list = state["session"]["excluded_theaters"]
     if excluded and faction not in excl_list:
         excl_list.append(faction)
     elif not excluded and faction in excl_list:
         excl_list.remove(faction)
-    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
@@ -329,7 +345,6 @@ def api_ping():
 
 @app.route("/save_custom_modifiers", methods=["POST"])
 def save_custom_modifiers():
-    """Saves the full custom_modifiers list: [{text, tier, planets: [...]}]."""
     data = request.get_json()
     modifiers = data.get("modifiers", [])
     valid = [
@@ -343,7 +358,6 @@ def save_custom_modifiers():
 
 @app.route("/save_faction_modifier", methods=["POST"])
 def save_faction_modifier():
-    """Toggles a single faction modifier key on/off for a planet."""
     data = request.get_json()
     planet = data.get("planet")
     key = data.get("key")
@@ -367,16 +381,14 @@ def save_faction_modifier():
 def save_free_stratagems():
     data = request.get_json()
     stratagems = data.get("stratagems", [])
-    state["flavor"]["free_stratagems"] = [
+    state["session"]["free_stratagems"] = [
         s for s in stratagems if isinstance(s, dict) and s.get("name", "").strip()
     ]
-    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
 @app.route("/reset_modifiers", methods=["POST"])
 def reset_modifiers():
-    """Clears all faction modifier selections and custom modifiers."""
     state["flavor"]["planet_modifiers"] = {}
     state["flavor"]["custom_modifiers"] = []
     _save_flavor(state["flavor"])
@@ -385,18 +397,16 @@ def reset_modifiers():
 
 @app.route("/save_dispatch_selection", methods=["POST"])
 def save_dispatch_selection():
-    """Toggles a dispatch ID in the selected_dispatches list."""
     data = request.get_json()
     dispatch_id = data.get("id")
     checked = data.get("checked", False)
     if dispatch_id is None:
         return jsonify({"status": "error", "message": "Missing id"}), 400
-    selected = state["flavor"].setdefault("selected_dispatches", [])
+    selected = state["session"]["selected_dispatches"]
     if checked and dispatch_id not in selected:
         selected.append(dispatch_id)
     elif not checked and dispatch_id in selected:
         selected.remove(dispatch_id)
-    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
