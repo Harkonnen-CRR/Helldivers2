@@ -923,7 +923,7 @@
         <div class="tier-radios">
           <label class="tier-large"><input type="radio" name="${key}" value="large" ${item.tier === 'large' ? 'checked' : ''} onchange="saveTier('${key}', 'large')"> Large</label>
           <label class="tier-small"><input type="radio" name="${key}" value="small" ${item.tier === 'small' ? 'checked' : ''} onchange="saveTier('${key}', 'small')"> Small</label>
-          <label class="tier-none"> <input type="radio" name="${key}" value="none"  ${item.tier === 'none'  ? 'checked' : ''} onchange="saveTier('${key}', 'none')">  None</label>
+          <label class="tier-none"> <input type="radio" name="${key}" value="none"  ${item.tier === 'none'  ? 'checked' : ''} onchange="saveTier('${key}', 'none')">  Minimal</label>
         </div>
         <div class="hazard-desc">${escHtml(item.description)}</div>
       `;
@@ -952,7 +952,7 @@
   function scheduleReformat() {
     clearTimeout(_reformatTimer);
     _reformatTimer = setTimeout(() => {
-      if (document.getElementById('reformat-btn').style.display !== 'none') reformat();
+      if (document.getElementById('out-discord').value.trim()) reformat();
     }, 1000);
   }
 
@@ -1248,7 +1248,7 @@
       <select class="custom-mod-tier">
         <option value="large" ${tier === 'large' ? 'selected' : ''}>Large</option>
         <option value="small" ${tier === 'small' ? 'selected' : ''}>Small</option>
-        <option value="none"  ${tier === 'none'  ? 'selected' : ''}>None</option>
+        <option value="none"  ${tier === 'none'  ? 'selected' : ''}>Minimal</option>
       </select>
       <div class="custom-mod-planets">${planetChecksHTML}</div>
       <button class="custom-mod-del" title="Remove">×</button>
