@@ -553,7 +553,6 @@
     </div>
     <button id="refresh-btn" onclick="startRefresh()">⟳ RUN CALCULATIONS</button>
     <button id="cancel-btn" class="cancel" onclick="cancelRefresh()" style="display:none">✕ CANCEL</button>
-    <button id="reformat-btn" class="secondary" onclick="reformat()" style="display:none">↺ REFRESH TEXT</button>
     <span id="status-msg"></span>
     <span class="api-status" id="api-status">
       <span class="api-dot"></span>
@@ -689,12 +688,14 @@
   <div class="section" id="flavor-section">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
       <h3 style="margin:0">Flavor Text Editor</h3>
-      <button class="secondary" onclick="reformat()" id="reformat-flavor-btn" style="display:none">↺ REFRESH TEXT</button>
     </div>
     <div id="theater-cards"></div>
   </div>
 
   <!-- Outputs -->
+  <div style="display:flex;justify-content:center;margin-bottom:8px">
+    <button id="reformat-btn" class="secondary" onclick="reformat()" style="display:none">↺ REFRESH TEXT</button>
+  </div>
   <div class="outputs-row">
     <div class="section">
       <h3>Discord Post</h3>
@@ -849,7 +850,6 @@
     document.getElementById('out-video').value = data.video;
     updateCharCount();
     document.getElementById('reformat-btn').style.display = 'inline-block';
-    document.getElementById('reformat-flavor-btn').style.display = 'inline-block';
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
