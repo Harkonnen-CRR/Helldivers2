@@ -46,11 +46,11 @@ def _merged_flavor():
 
 
 _MOCK_ASSIGNMENTS_PATH = "fixtures/mock_assignments.json"
-_VALID_MOCK_FACTIONS = {"Terminids", "Automaton", "Illuminate"}
+_VALID_MOCK_FACTIONS = {"Terminids", "Automaton", "Illuminate", "All"}
 
 
 def _inject_mock_order(parsed):
-    """Injects a mock order into parsed data when mock mode is active and no real orders exist."""
+    """Injects mock order(s) when mock mode is active and no real orders exist."""
     if parsed.get("orders"):
         return parsed  # real orders always take priority
     faction = state["session"].get("mock_mo_faction")
@@ -60,13 +60,24 @@ def _inject_mock_order(parsed):
         return parsed
     with open(_MOCK_ASSIGNMENTS_PATH) as f:
         mocks = json.load(f)
-    mock_order = mocks.get(faction)
-    if not mock_order:
-        return parsed
-    mock_order = dict(mock_order)
-    mock_order["expiration"] = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    expiry = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    if faction == "All":
+        orders = []
+        for key in ("Terminids", "Automaton", "Illuminate"):
+            m = mocks.get(key)
+            if m:
+                m = dict(m)
+                m["expiration"] = expiry
+                orders.append(m)
+    else:
+        m = mocks.get(faction)
+        if not m:
+            return parsed
+        m = dict(m)
+        m["expiration"] = expiry
+        orders = [m]
     parsed = dict(parsed)
-    parsed["orders"] = [mock_order]
+    parsed["orders"] = orders
     return parsed
 
 

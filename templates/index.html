@@ -695,6 +695,10 @@
           <input type="radio" name="mock-faction" value="Illuminate" onchange="onMockFactionChange('Illuminate')">
           Illuminate — Eradicate (multi-faction)
         </label>
+        <label class="mock-faction-label" style="color:#aaa;margin-top:4px;border-top:1px solid #333;padding-top:8px">
+          <input type="radio" name="mock-faction" value="All" onchange="onMockFactionChange('All')">
+          All Types — 3 orders (tests Major / Minor / Strategic titles)
+        </label>
       </div>
     </div>
   </div>
@@ -1062,6 +1066,14 @@
     if (_ordersData.length === 0 && manualOrders.length === 0) {
       list.innerHTML = '<div class="no-hazards">No active orders — run Refresh to load.</div>';
       return;
+    }
+
+    // Ensure the section body is visible when we have real content
+    const body = document.getElementById('orders-body');
+    const icon = document.getElementById('orders-icon');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      icon.textContent = '▲';
     }
 
     _ordersData.forEach((order, i) => {
