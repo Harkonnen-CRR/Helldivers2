@@ -335,6 +335,17 @@
     textarea.planet-flavor-text:focus { outline: none; border-color: #444; }
     textarea.planet-flavor-text.visible { display: block; }
 
+    .flavor-clear-bar {
+      display: flex; gap: 4px; margin-top: 3px; justify-content: flex-end;
+    }
+    button.flavor-clear-btn {
+      background: none; border: 1px solid #333; border-radius: 3px;
+      color: #666; font-size: 10px; padding: 1px 6px; cursor: pointer; font-family: 'Courier New', monospace;
+    }
+    button.flavor-clear-btn:hover { border-color: #666; color: #aaa; }
+    button.flavor-undo-btn { border-color: #3a3a00; color: #888; }
+    button.flavor-undo-btn:hover { border-color: #888; color: #f0c040; }
+
     /* Output panels */
     .outputs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
@@ -1657,10 +1668,58 @@
       container.appendChild(card);
     }
 
-    // Wire up auto-save for all flavor textareas
+    // Wire up auto-save and clear/undo for all flavor textareas
     container.querySelectorAll('textarea[data-scope]').forEach(ta => {
       ta.addEventListener('input', () => saveFlavor(ta.dataset.scope, ta.dataset.key, ta.value));
+      attachClearUndo(ta);
     });
+  }
+
+  function attachClearUndo(ta) {
+    let undoVal = null;
+
+    const bar = document.createElement('div');
+    bar.className = 'flavor-clear-bar';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'flavor-clear-btn';
+    clearBtn.textContent = 'Clear';
+    clearBtn.onclick = (e) => {
+      e.preventDefault();
+      if (!ta.value.trim()) return;
+      undoVal = ta.value;
+      ta.value = '';
+      saveFlavor(ta.dataset.scope, ta.dataset.key, '');
+      undoBtn.style.display = 'inline-block';
+      scheduleReformat();
+    };
+
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'flavor-clear-btn flavor-undo-btn';
+    undoBtn.textContent = '↩ Undo';
+    undoBtn.style.display = 'none';
+    undoBtn.onclick = (e) => {
+      e.preventDefault();
+      if (undoVal !== null) {
+        ta.value = undoVal;
+        saveFlavor(ta.dataset.scope, ta.dataset.key, undoVal);
+        undoVal = null;
+        undoBtn.style.display = 'none';
+        scheduleReformat();
+      }
+    };
+
+    // Any manual typing after a clear discards the undo state
+    ta.addEventListener('input', () => {
+      if (undoVal !== null) {
+        undoVal = null;
+        undoBtn.style.display = 'none';
+      }
+    });
+
+    bar.appendChild(clearBtn);
+    bar.appendChild(undoBtn);
+    ta.after(bar);
   }
 
   function buildRefPanelHTML(theater, planetNotes) {

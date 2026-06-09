@@ -97,6 +97,14 @@ def _render_task_label(task, planet_index_to_name):
         count = values[0]
         faction = _FACTION_MAP.get(values[1], f"Faction {values[1]}")
         return f"Eradicate {count} {faction}"
+    if decoded == "win_missions":
+        vt = task.get("value_types", [])
+        target = next((val for vtype, val in zip(vt, values) if vtype == 3), None)
+        faction_id = next((val for vtype, val in zip(vt, values) if vtype == 1), None)
+        label = f"Complete {target:,} missions" if target else "Complete missions"
+        if faction_id:
+            label += f" against {_FACTION_MAP.get(faction_id, f'Faction {faction_id}')}"
+        return label
     return f"Unknown objective (raw values: {values})"
 
 
@@ -190,6 +198,13 @@ def _format_mo_task_status(status_info, discord=True):
     t = status_info.get("type")
     if t == "secure":
         return " — **SECURE** ✓" if discord else " — SECURE ✓"
+    if t == "progress":
+        count = status_info.get("count", 0)
+        target = status_info.get("target", 1)
+        pct = status_info.get("pct", 0.0)
+        if pct >= 100:
+            return " — **COMPLETE** ✓" if discord else " — COMPLETE ✓"
+        return f" — {count:,} / {target:,} ({pct:.1f}%)"
     if t not in ("liberation", "defense"):
         return ""
     pct = status_info.get("progress_pct", 0.0)
@@ -205,6 +220,34 @@ def _format_mo_task_status(status_info, discord=True):
     if lib_time is not None:
         return f" — {pct}% | LIBERATED in {format_duration(lib_time)}"
     return f" — {pct}%"
+
+
+def _get_task_status_info(task, task_idx, order, mo_task_statuses, top_planets_by_index):
+    """Returns status_info dict for one MO task, or None if unavailable."""
+    decoded = task["decoded_type"]
+    vt = task.get("value_types", [])
+    vals = task.get("values", [])
+
+    if decoded == "win_missions":
+        progress_list = order.get("progress") or []
+        count = progress_list[task_idx] if task_idx < len(progress_list) else 0
+        target = next((v for t, v in zip(vt, vals) if t == 3), None)
+        if target and target > 0:
+            pct = min(100.0, count / target * 100)
+            return {"type": "progress", "count": count, "target": target, "pct": pct}
+        return None
+
+    if decoded in ("liberate_planet", "defense_planet"):
+        planet_idx = next((v for t, v in zip(vt, vals) if t == 12), None)
+        if planet_idx is not None and planet_idx in mo_task_statuses:
+            status_info = dict(mo_task_statuses[planet_idx])
+            top_p = top_planets_by_index.get(planet_idx)
+            if top_p:
+                status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
+                status_info["event"] = top_p.get("event")
+            return status_info
+
+    return None
 
 
 def _format_region_status(region):
@@ -508,20 +551,8 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
         lines.append(f"> **Reward:** {order['reward_amount']} {reward_label}")
         lines.append(f"> **Expires in:** {format_duration(_time_remaining_hours(order['expiration']))}")
         lines.append("> **Objectives:**")
-        for task in order["tasks"]:
-            planet_idx = None
-            if task["decoded_type"] in ("liberate_planet", "defense_planet"):
-                for vtype, val in zip(task["value_types"], task["values"]):
-                    if vtype == 12:
-                        planet_idx = val
-                        break
-            status_info = None
-            if planet_idx is not None and planet_idx in mo_task_statuses:
-                status_info = dict(mo_task_statuses[planet_idx])
-                top_p = top_planets_by_index.get(planet_idx)
-                if top_p:
-                    status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
-                    status_info["event"] = top_p.get("event")
+        for task_idx, task in enumerate(order["tasks"]):
+            status_info = _get_task_status_info(task, task_idx, order, mo_task_statuses, top_planets_by_index)
             lines.append(f">   • {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=True)}")
         lines.append("")
 
@@ -712,20 +743,8 @@ def format_video(parsed_data, classifications, flavor_texts=None):
         lines.append(f"    Reward: {order['reward_amount']} {reward_label}")
         lines.append(f"    Expires in: {format_duration(_time_remaining_hours(order['expiration']))}")
         lines.append("    Objectives:")
-        for task in order["tasks"]:
-            planet_idx = None
-            if task["decoded_type"] in ("liberate_planet", "defense_planet"):
-                for vtype, val in zip(task["value_types"], task["values"]):
-                    if vtype == 12:
-                        planet_idx = val
-                        break
-            status_info = None
-            if planet_idx is not None and planet_idx in mo_task_statuses:
-                status_info = dict(mo_task_statuses[planet_idx])
-                top_p = top_planets_by_index.get(planet_idx)
-                if top_p:
-                    status_info["liberation_time_hours"] = top_p.get("liberation_time_hours")
-                    status_info["event"] = top_p.get("event")
+        for task_idx, task in enumerate(order["tasks"]):
+            status_info = _get_task_status_info(task, task_idx, order, mo_task_statuses, top_planets_by_index)
             lines.append(f"      - {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=False)}")
         lines.append("")
 

@@ -9,6 +9,7 @@ _TASK_TYPE_MAP = {
     13: "defense_planet",
     12: "control_planet",
     3: "eradicate",
+    9: "win_missions",
 }
 
 _STATUS_LABEL_MAP = {
