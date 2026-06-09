@@ -292,11 +292,13 @@ _DEFAULT_ORDER_TITLES = [
 
 
 def _get_order_title(order, index, flavor):
-    """Returns the user-selected title for an order, falling back to position-based default."""
+    """Returns the user-selected title for an order, falling back to suggested then position-based default."""
     labels = flavor.get("order_labels") or {}
     saved = labels.get(str(order["id"]))
     if saved:
         return saved
+    if order.get("suggested_title"):
+        return order["suggested_title"]
     if index < len(_DEFAULT_ORDER_TITLES):
         return _DEFAULT_ORDER_TITLES[index]
     return "ALERT: ORDER UPDATE"
