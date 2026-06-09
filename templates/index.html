@@ -528,6 +528,7 @@
     }
     .order-preview-briefing { font-size: 11px; color: #999; margin-bottom: 2px; }
     .order-preview-meta { font-size: 10px; color: #555; }
+    .order-id-hint { font-size: 10px; color: #444; margin-bottom: 4px; font-family: 'Courier New', monospace; }
 
     /* Dispatches panel */
     .dispatch-card {
@@ -1125,11 +1126,13 @@
     const rewardStr = order.reward_amount != null ? `Reward: ${order.reward_amount} Medals` : '';
     const meta = [rewardStr, expiryStr].filter(Boolean).join('  |  ');
 
+    const idStr = `ID ${order.id}${savedLabel ? '' : ' · unclassified'}`;
     div.innerHTML = `
       <div class="order-block-header">
         <select class="order-title-select">${_orderTitleOptions(currentLabel)}</select>
         <label class="order-show-toggle"><input type="checkbox" class="order-visible-cb" ${visible ? 'checked' : ''}> Show</label>
       </div>
+      <div class="order-id-hint">${escHtml(idStr)}</div>
       <input type="text" class="order-custom-input" placeholder="Custom title..." value="${isCustom ? escHtml(currentLabel) : ''}" style="display:${isCustom ? 'block' : 'none'}">
       <div class="order-preview">
         <div class="order-preview-briefing">${escHtml(order.briefing || '')}</div>
@@ -1140,6 +1143,11 @@
     const customInput = div.querySelector('.order-custom-input');
     const visibleCb = div.querySelector('.order-visible-cb');
 
+    const idHint = div.querySelector('.order-id-hint');
+    const clearUnclassified = () => {
+      if (idHint) idHint.textContent = `ID ${order.id}`;
+    };
+
     sel.addEventListener('change', () => {
       if (sel.value === '__custom__') {
         customInput.style.display = 'block';
@@ -1147,10 +1155,11 @@
       } else {
         customInput.style.display = 'none';
         saveOrderLabel(order.id, sel.value);
+        clearUnclassified();
       }
     });
     customInput.addEventListener('input', () => {
-      if (customInput.value.trim()) saveOrderLabel(order.id, customInput.value.trim());
+      if (customInput.value.trim()) { saveOrderLabel(order.id, customInput.value.trim()); clearUnclassified(); }
     });
     visibleCb.addEventListener('change', () => saveOrderVisibility(order.id, visibleCb.checked));
 

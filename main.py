@@ -15,7 +15,7 @@ CLASSIFICATIONS_PATH = "data/classifications.json"
 FLAVOR_PATH = "data/flavor.json"
 
 # Keys stored in flavor.json and loaded across sessions
-_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers"}
+_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels"}
 
 # Session-only defaults — reset on every page load, never written to disk
 _SESSION_DEFAULTS = {
@@ -23,7 +23,6 @@ _SESSION_DEFAULTS = {
     "excluded_theaters": [],
     "selected_dispatches": [],
     "free_stratagems": [],
-    "order_labels": {},       # {str(assignment_id): title string}
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
@@ -113,6 +112,7 @@ def _load_flavor():
     defaults = {
         "theaters": {}, "planets": {}, "planet_notes": {},
         "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
+        "order_labels": {},
     }
     if os.path.exists(FLAVOR_PATH):
         with open(FLAVOR_PATH) as f:
@@ -341,10 +341,12 @@ def save_order_label():
     title = data.get("title", "").strip()
     if not order_id:
         return jsonify({"status": "error", "message": "Missing id"}), 400
+    state["flavor"].setdefault("order_labels", {})
     if title:
-        state["session"]["order_labels"][str(order_id)] = title
+        state["flavor"]["order_labels"][str(order_id)] = title
     else:
-        state["session"]["order_labels"].pop(str(order_id), None)
+        state["flavor"]["order_labels"].pop(str(order_id), None)
+    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
