@@ -1,7 +1,7 @@
 import copy
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from flask import Flask, jsonify, render_template, request
 
@@ -26,6 +26,7 @@ _SESSION_DEFAULTS = {
     "order_labels": {},       # {str(assignment_id): title string}
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
     "manual_orders": [],      # [{title: str}] for header-only manual entries
+    "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
 }
 
 state = {
@@ -42,6 +43,31 @@ state = {
 def _merged_flavor():
     """Returns persistent flavor merged with current session state for formatter use."""
     return {**state["flavor"], **state["session"]}
+
+
+_MOCK_ASSIGNMENTS_PATH = "fixtures/mock_assignments.json"
+_VALID_MOCK_FACTIONS = {"Terminids", "Automaton", "Illuminate"}
+
+
+def _inject_mock_order(parsed):
+    """Injects a mock order into parsed data when mock mode is active and no real orders exist."""
+    if parsed.get("orders"):
+        return parsed  # real orders always take priority
+    faction = state["session"].get("mock_mo_faction")
+    if faction not in _VALID_MOCK_FACTIONS:
+        return parsed
+    if not os.path.exists(_MOCK_ASSIGNMENTS_PATH):
+        return parsed
+    with open(_MOCK_ASSIGNMENTS_PATH) as f:
+        mocks = json.load(f)
+    mock_order = mocks.get(faction)
+    if not mock_order:
+        return parsed
+    mock_order = dict(mock_order)
+    mock_order["expiration"] = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    parsed = dict(parsed)
+    parsed["orders"] = [mock_order]
+    return parsed
 
 
 def _api_error_type(status_code):
@@ -167,7 +193,7 @@ def refresh():
             snapshot1_health[f"{idx}_r{r['id']}"] = r["health"]
     state["snapshot1_health"] = snapshot1_health
 
-    parsed = parse_all()
+    parsed = _inject_mock_order(parse_all())
     items = _get_classification_items(raw_planets)
 
     saved = state["classifications"]
@@ -208,7 +234,7 @@ def fetch2():
         return jsonify({"status": "error", "message": str(e), "error_type": "unknown"}), 200
 
     snapshot2_time = datetime.now()
-    parsed = parse_all()
+    parsed = _inject_mock_order(parse_all())
 
     elapsed = (snapshot2_time - state["snapshot1_time"]).total_seconds()
     if elapsed > 0:
@@ -329,6 +355,16 @@ def save_manual_orders():
     state["session"]["manual_orders"] = [
         m for m in orders if isinstance(m, dict) and m.get("title", "").strip()
     ]
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_mock_mo", methods=["POST"])
+def save_mock_mo():
+    data = request.get_json()
+    faction = data.get("faction")  # null disables mock
+    if faction is not None and faction not in _VALID_MOCK_FACTIONS:
+        return jsonify({"status": "error", "message": "Invalid faction"}), 400
+    state["session"]["mock_mo_faction"] = faction
     return jsonify({"status": "ok"})
 
 

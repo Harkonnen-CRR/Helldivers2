@@ -1,0 +1,80 @@
+{
+  "Terminids": {
+    "id": 99991,
+    "title": "Mock Terminid Order",
+    "briefing": "[MOCK] Terminid swarms are advancing on the Inner Colonies. Helldivers must push back the infestation and reclaim these worlds for Super Earth.",
+    "description": "All available Helldivers are ordered to deploy immediately. For Super Earth.",
+    "reward_type": 0,
+    "reward_amount": 45,
+    "expiration": null,
+    "tasks": [
+      {
+        "type": 11,
+        "values": [0, 0, 129],
+        "value_types": [3, 11, 12],
+        "decoded_type": "liberate_planet"
+      },
+      {
+        "type": 11,
+        "values": [0, 0, 173],
+        "value_types": [3, 11, 12],
+        "decoded_type": "liberate_planet"
+      }
+    ],
+    "progress": [0, 0]
+  },
+  "Automaton": {
+    "id": 99992,
+    "title": "Mock Automaton Order",
+    "briefing": "[MOCK] Automaton forces are launching coordinated assaults across two fronts. Helldivers must hold the line and repel the mechanical invasion.",
+    "description": "Defensive operations are authorized at full scale. Managed Democracy prevails.",
+    "reward_type": 0,
+    "reward_amount": 45,
+    "expiration": null,
+    "tasks": [
+      {
+        "type": 13,
+        "values": [0, 0, 199],
+        "value_types": [3, 11, 12],
+        "decoded_type": "defense_planet"
+      },
+      {
+        "type": 13,
+        "values": [0, 0, 114],
+        "value_types": [3, 11, 12],
+        "decoded_type": "defense_planet"
+      }
+    ],
+    "progress": [0, 0]
+  },
+  "Illuminate": {
+    "id": 99993,
+    "title": "Mock Illuminate Order",
+    "briefing": "[MOCK] High Command has issued a multi-front extermination order. Helldivers are to engage and eliminate enemy forces across all active theaters.",
+    "description": "No quarter. No retreat. Liberty or death.",
+    "reward_type": 0,
+    "reward_amount": 45,
+    "expiration": null,
+    "tasks": [
+      {
+        "type": 3,
+        "values": [2000000, 2],
+        "value_types": [2, 1],
+        "decoded_type": "eradicate"
+      },
+      {
+        "type": 3,
+        "values": [1500000, 3],
+        "value_types": [2, 1],
+        "decoded_type": "eradicate"
+      },
+      {
+        "type": 3,
+        "values": [500000, 4],
+        "value_types": [2, 1],
+        "decoded_type": "eradicate"
+      }
+    ],
+    "progress": [0, 0, 0]
+  }
+}

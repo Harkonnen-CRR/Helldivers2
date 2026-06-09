@@ -259,6 +259,16 @@
     .ref-dss-action.inactive { color: #444; }
     .ref-dss-action-desc { font-size: 10px; color: #555; font-style: italic; padding-left: 10px; margin-bottom: 4px; }
 
+    .mock-faction-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .mock-faction-label input[type="radio"] { cursor: pointer; }
+
     .planet-notes-label {
       color: #4a7a50;
       font-size: 10px;
@@ -660,6 +670,35 @@
   </div>
 
   <!-- Flavor editor -->
+  <div class="section" id="testing-section" style="border-color:#7a6000;background:#1a1600">
+    <div class="modifiers-header" onclick="toggleSection('testing-body', 'testing-icon')">
+      <h3 style="margin:0;color:#c8a000">&#9888; Testing</h3>
+      <span class="toggle-icon" id="testing-icon">▲</span>
+    </div>
+    <div id="testing-body">
+      <div style="margin-bottom:8px;font-size:12px;color:#888">Mock data only activates when no real MO is active.</div>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="mock-mo-enabled" onchange="onMockMoToggle(this.checked)">
+        <span>Enable Mock Major Order</span>
+      </label>
+      <div id="mock-mo-factions" style="display:none;margin-left:24px">
+        <div style="margin-bottom:6px;font-size:12px;color:#aaa">Select faction scenario:</div>
+        <label class="mock-faction-label" style="color:#D4A017">
+          <input type="radio" name="mock-faction" value="Terminids" onchange="onMockFactionChange('Terminids')">
+          Terminids — 2 Liberation targets
+        </label>
+        <label class="mock-faction-label" style="color:#E55039">
+          <input type="radio" name="mock-faction" value="Automaton" onchange="onMockFactionChange('Automaton')">
+          Automaton — 2 Defense targets
+        </label>
+        <label class="mock-faction-label" style="color:#7B52AB">
+          <input type="radio" name="mock-faction" value="Illuminate" onchange="onMockFactionChange('Illuminate')">
+          Illuminate — Eradicate (multi-faction)
+        </label>
+      </div>
+    </div>
+  </div>
+
   <div class="section" id="flavor-section">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
       <h3 style="margin:0">Flavor Text Editor</h3>
@@ -1162,6 +1201,28 @@
       body: JSON.stringify({ orders }),
     });
     scheduleReformat();
+  }
+
+  // ── Mock MO Testing ──────────────────────────────────────────
+
+  function onMockMoToggle(enabled) {
+    document.getElementById('mock-mo-factions').style.display = enabled ? 'block' : 'none';
+    if (!enabled) {
+      document.querySelectorAll('input[name="mock-faction"]').forEach(r => r.checked = false);
+      fetch('/save_mock_mo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faction: null }),
+      });
+    }
+  }
+
+  function onMockFactionChange(faction) {
+    fetch('/save_mock_mo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faction }),
+    });
   }
 
   // ── Modifier panel (Special Factions + Custom Modifiers) ─────
