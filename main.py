@@ -24,6 +24,7 @@ _SESSION_DEFAULTS = {
     "selected_dispatches": [],
     "free_stratagems": [],
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
+    "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
 }
@@ -368,6 +369,18 @@ def save_manual_orders():
     state["session"]["manual_orders"] = [
         m for m in orders if isinstance(m, dict) and m.get("title", "").strip()
     ]
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_global_limit", methods=["POST"])
+def save_global_limit():
+    data = request.get_json()
+    try:
+        val = int(data.get("limit", 5))
+        val = max(0, val)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "Invalid limit"}), 400
+    state["session"]["global_planet_limit"] = val
     return jsonify({"status": "ok"})
 
 

@@ -415,6 +415,78 @@ def _build_theaters(parsed_data):
     return theater_order, theaters
 
 
+def _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded):
+    """Applies a global planet cap with a 3-front guarantee.
+
+    Selects at most global_limit planets total across all non-excluded factions.
+    Every non-excluded faction that has any planets is guaranteed at least one slot.
+    When a faction would be dropped, the lowest-priority planet from the most
+    over-represented faction is swapped out in its favour.
+    Returns a new (theater_order, theaters) pair.
+    """
+    if not global_limit or global_limit <= 0:
+        return theater_order, theaters
+
+    orders = parsed_data.get("orders", [])
+    mo_indices = _get_mo_planet_indices(parsed_data)
+    mo_target_faction = _get_mo_target_faction(parsed_data)
+    has_unknown_task = any(
+        t["decoded_type"].startswith("unknown_type_")
+        for order in orders
+        for t in order.get("tasks", [])
+    )
+
+    def sort_key(planet):
+        return _planet_sort_key(planet, mo_indices, mo_target_faction, has_unknown_task)
+
+    active = [f for f in theater_order if f not in excluded]
+
+    # Flatten all active planets globally, sorted by priority
+    all_tagged = []
+    for faction in active:
+        for planet in theaters.get(faction, []):
+            all_tagged.append((faction, planet))
+    all_tagged.sort(key=lambda fp: sort_key(fp[1]))
+
+    if not all_tagged:
+        return theater_order, theaters
+
+    selected = list(all_tagged[:global_limit])
+
+    # Guarantee each active faction with planets has at least one slot
+    for faction in active:
+        if any(f == faction for f, _ in selected):
+            continue
+
+        # Best available planet from this faction not already selected
+        sel_indices = {p["index"] for _, p in selected}
+        available = [p for f, p in all_tagged if f == faction and p["index"] not in sel_indices]
+        if not available:
+            continue
+
+        # Swap out the worst-priority planet from a faction holding >1 slot
+        counts = {}
+        for f, _ in selected:
+            counts[f] = counts.get(f, 0) + 1
+        over = {f for f, c in counts.items() if c > 1}
+        if not over:
+            continue
+
+        candidates = [(i, p) for i, (f, p) in enumerate(selected) if f in over]
+        candidates.sort(key=lambda ip: sort_key(ip[1]), reverse=True)
+        selected[candidates[0][0]] = (faction, available[0])
+
+    # Rebuild theater structures preserving original faction order
+    new_theaters = {}
+    for faction, planet in selected:
+        new_theaters.setdefault(faction, []).append(planet)
+    for faction in new_theaters:
+        new_theaters[faction].sort(key=sort_key)
+    new_order = [f for f in theater_order if f in new_theaters]
+
+    return new_order, new_theaters
+
+
 def _format_hazard_discord(hazard, classifications):
     key = f"hazard_{hazard['name']}"
     tier = classifications.get(key, "none")
@@ -588,9 +660,13 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
     excluded = set(flavor_texts.get("excluded_theaters", []))
-    for faction in theater_order:
-        if limits.get(faction):
-            theaters[faction] = theaters[faction][:1]
+    global_limit = int(flavor_texts.get("global_planet_limit") or 0)
+    if global_limit > 0:
+        theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
+    else:
+        for faction in theater_order:
+            if limits.get(faction):
+                theaters[faction] = theaters[faction][:1]
     theater_order = [f for f in theater_order if f not in excluded]
 
     for i, faction in enumerate(theater_order):
@@ -784,9 +860,13 @@ def format_video(parsed_data, classifications, flavor_texts=None):
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
     excluded = set(flavor_texts.get("excluded_theaters", []))
-    for faction in theater_order:
-        if limits.get(faction):
-            theaters[faction] = theaters[faction][:1]
+    global_limit = int(flavor_texts.get("global_planet_limit") or 0)
+    if global_limit > 0:
+        theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
+    else:
+        for faction in theater_order:
+            if limits.get(faction):
+                theaters[faction] = theaters[faction][:1]
     theater_order = [f for f in theater_order if f not in excluded]
 
     for faction in theater_order:
