@@ -19,6 +19,45 @@ _STATUS_LABEL_MAP = {
     3: "cooldown",
 }
 
+_EFFECT_LABELS_PATH = os.path.join("fixtures", "effect_labels.json")
+_PLANET_EFFECTS_PATH = os.path.join("data", "planet_effects.json")
+
+
+def _load_effect_labels():
+    """Bundled, editable ID→meaning dictionary. Missing/malformed → empty (graceful)."""
+    try:
+        with open(_EFFECT_LABELS_PATH) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _build_effects_by_index():
+    """Returns {planet_index: [{id, name, description, known}]} from the cached
+    raw-API effects, resolved against the bundled label dictionary. Unknown IDs
+    degrade to 'Effect <id>' with known=False. Returns {} if no effects cached
+    (raw API never succeeded) — purely additive, never fatal to the core parse."""
+    try:
+        with open(_PLANET_EFFECTS_PATH) as f:
+            cache = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    labels = _load_effect_labels()
+    by_index = {}
+    for e in cache.get("effects", []):
+        idx = e.get("index")
+        eid = e.get("galacticEffectId")
+        if idx is None or eid is None:
+            continue
+        label = labels.get(str(eid))
+        if label:
+            entry = {"id": eid, "name": label.get("name", f"Effect {eid}"),
+                     "description": label.get("description", ""), "known": True}
+        else:
+            entry = {"id": eid, "name": f"Effect {eid}", "description": "", "known": False}
+        by_index.setdefault(idx, []).append(entry)
+    return by_index
+
 
 def _load(filename):
     path = os.path.join("data", filename)
@@ -31,7 +70,7 @@ def _load(filename):
         raise ValueError(f"Malformed JSON in {path}: {e}")
 
 
-def _build_planet(planet, campaigns_by_index):
+def _build_planet(planet, campaigns_by_index, effects_by_index=None):
     stats = planet["statistics"]
     player_count = stats["playerCount"]
     health = planet["health"]
@@ -98,6 +137,7 @@ def _build_planet(planet, campaigns_by_index):
         "campaign_level": campaign["count"] if campaign else None,
         "campaign_type": campaign["type"] if campaign else None,
         "event": event,
+        "active_effects": (effects_by_index or {}).get(planet["index"], []),
     }
 
 
@@ -282,8 +322,9 @@ def parse_all():
 
     campaigns_by_index = {c["planet"]["index"]: c for c in campaigns_data}
 
+    effects_by_index = _build_effects_by_index()
     top_planets = sorted(planets_data, key=lambda p: p["statistics"]["playerCount"], reverse=True)[:5]
-    planets = [_build_planet(p, campaigns_by_index) for p in top_planets]
+    planets = [_build_planet(p, campaigns_by_index, effects_by_index) for p in top_planets]
 
     return {
         "planets": planets,
