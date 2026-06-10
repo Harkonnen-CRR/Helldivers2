@@ -608,6 +608,21 @@ def get_output_sections():
     return [{"key": k, "label": SECTION_LABELS[k]} for k in SECTION_KEYS]
 
 
+def _resolve_effect_text(effect, effect_formats):
+    """Display text for a detected planet effect, or None to skip in output.
+    Rule: user format (respecting enabled) > community label name (known) > None.
+    Unlabeled unknown effects (no community name, no user format) never render."""
+    fmt = (effect_formats or {}).get(str(effect["id"]))
+    if fmt is not None:
+        if not fmt.get("enabled", True):
+            return None
+        text = (fmt.get("text") or "").strip()
+        if text:
+            return text
+        return effect["name"] if effect.get("known") else None
+    return effect["name"] if effect.get("known") else None
+
+
 # ── Discord section renderers — each returns a list of lines (empty if N/A) ──
 
 def _section_orders_discord(parsed_data, flavor_texts):
@@ -768,6 +783,11 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
                     except KeyError:
                         output = mod["output"]
                     lines.append(f"> **{output}**")
+
+            for eff in planet.get("active_effects", []):
+                text = _resolve_effect_text(eff, flavor_texts.get("effect_formats"))
+                if text:
+                    lines.append(f"> **{text}**")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
             for hazard in hazards:
@@ -950,6 +970,11 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
                     except KeyError:
                         output = mod["output"]
                     lines.append(f"    {output}")
+
+            for eff in planet.get("active_effects", []):
+                text = _resolve_effect_text(eff, flavor_texts.get("effect_formats"))
+                if text:
+                    lines.append(f"    {text}")
 
             lines.append(f"    Sector: {planet['sector']} | Biome: {planet['biome']}")
             campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")

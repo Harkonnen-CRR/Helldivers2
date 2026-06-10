@@ -15,7 +15,7 @@ CLASSIFICATIONS_PATH = "data/classifications.json"
 FLAVOR_PATH = "data/flavor.json"
 
 # Keys stored in flavor.json and loaded across sessions
-_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels"}
+_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels", "effect_formats"}
 
 # Session-only defaults — reset on every page load, never written to disk
 _SESSION_DEFAULTS = {
@@ -113,7 +113,7 @@ def _load_flavor():
     defaults = {
         "theaters": {}, "planets": {}, "planet_notes": {},
         "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
-        "order_labels": {},
+        "order_labels": {}, "effect_formats": {},
     }
     if os.path.exists(FLAVOR_PATH):
         with open(FLAVOR_PATH) as f:
