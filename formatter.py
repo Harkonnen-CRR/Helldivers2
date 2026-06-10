@@ -608,19 +608,43 @@ def get_output_sections():
     return [{"key": k, "label": SECTION_LABELS[k]} for k in SECTION_KEYS]
 
 
-def _resolve_effect_text(effect, effect_formats):
-    """Display text for a detected planet effect, or None to skip in output.
-    Rule: user format (respecting enabled) > community label name (known) > None.
-    Unlabeled unknown effects (no community name, no user format) never render."""
+def _effect_display(effect, effect_formats):
+    """Returns (name, description) to show for an effect, or None to skip.
+    Custom format text replaces the name and drops the description (the user's
+    phrasing is the whole line). Default = community name + description.
+    Unlabeled unknowns never render."""
     fmt = (effect_formats or {}).get(str(effect["id"]))
     if fmt is not None:
         if not fmt.get("enabled", True):
             return None
         text = (fmt.get("text") or "").strip()
         if text:
-            return text
-        return effect["name"] if effect.get("known") else None
-    return effect["name"] if effect.get("known") else None
+            return (text, "")
+        # empty custom text + enabled → fall through to default
+    if effect.get("known"):
+        return (effect["name"], (effect.get("description") or "").strip())
+    return None
+
+
+def _dedup_effects(effects):
+    """Collapses effects that share an identical description — the API's paired
+    '(Enemies)' duplicates (e.g. 1307 'HIVE LORDS (Enemies)' + 1308 'HIVE LORDS').
+    Keeps one per description, preferring the name without a parenthetical.
+    Effects with no description (unlabeled unknowns) pass through untouched."""
+    order = []
+    by_desc = {}
+    for e in effects:
+        d = (e.get("description") or "").strip().lower()
+        if not d:
+            order.append(e)
+            continue
+        if d not in by_desc:
+            by_desc[d] = e
+            order.append(e)
+        elif "(" in by_desc[d]["name"] and "(" not in e["name"]:
+            order[order.index(by_desc[d])] = e  # prefer the clean name
+            by_desc[d] = e
+    return order
 
 
 # ── Discord section renderers — each returns a list of lines (empty if N/A) ──
@@ -784,10 +808,11 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
                         output = mod["output"]
                     lines.append(f"> **{output}**")
 
-            for eff in planet.get("active_effects", []):
-                text = _resolve_effect_text(eff, flavor_texts.get("effect_formats"))
-                if text:
-                    lines.append(f"> **{text}**")
+            for eff in _dedup_effects(planet.get("active_effects", [])):
+                disp = _effect_display(eff, flavor_texts.get("effect_formats"))
+                if disp:
+                    name, desc = disp
+                    lines.append(f"> **{name}** — *{desc}*" if desc else f"> **{name}**")
 
             hazards = [h for h in planet.get("hazards", []) if h.get("name") and h["name"] != "None"]
             for hazard in hazards:
@@ -971,10 +996,11 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
                         output = mod["output"]
                     lines.append(f"    {output}")
 
-            for eff in planet.get("active_effects", []):
-                text = _resolve_effect_text(eff, flavor_texts.get("effect_formats"))
-                if text:
-                    lines.append(f"    {text}")
+            for eff in _dedup_effects(planet.get("active_effects", [])):
+                disp = _effect_display(eff, flavor_texts.get("effect_formats"))
+                if disp:
+                    name, desc = disp
+                    lines.append(f"    {name} — {desc}" if desc else f"    {name}")
 
             lines.append(f"    Sector: {planet['sector']} | Biome: {planet['biome']}")
             campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")

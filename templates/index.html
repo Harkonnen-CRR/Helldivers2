@@ -1385,7 +1385,7 @@
     } else {
       row.innerHTML = `
         <label class="eff-enable" title="Show in output"><input type="checkbox" ${e.enabled !== false ? 'checked' : ''}></label>
-        <span class="eff-name" title="ID ${e.id}">${escHtml(e.name)}</span>
+        <span class="eff-name" title="ID ${e.id}${e.description ? ' — ' + escHtml(e.description) : ''}">${escHtml(e.name)}</span>
         <input class="eff-text" type="text" placeholder="${escHtml(e.name)}" value="${escHtml(e.text || '')}">
         <span class="eff-planets" title="${escHtml(planets)}">${count}p</span>`;
       const input = row.querySelector('.eff-text');
