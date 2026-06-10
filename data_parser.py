@@ -156,7 +156,13 @@ def _build_mo_task_statuses(assignments, planets_data, campaigns_by_index):
 
 def _build_order(a):
     """Builds a single order dict from one assignment entry."""
-    reward = a.get("reward", {})
+    # API may send reward as null (e.g. Strategic Threats with no medal reward),
+    # or a newer rewards[] array. Fall back through both safely.
+    reward = a.get("reward") or {}
+    if not reward:
+        rewards = a.get("rewards") or []
+        if rewards:
+            reward = rewards[0]
     tasks = []
     for t in a.get("tasks", []):
         task_type = t["type"]

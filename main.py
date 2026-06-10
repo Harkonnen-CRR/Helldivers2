@@ -7,7 +7,7 @@ from flask import Flask, jsonify, render_template, request
 
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all
-from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections
 
 app = Flask(__name__)
 
@@ -176,6 +176,7 @@ def index():
         "index.html",
         classifications=state["classifications"],
         outputs=state["last_outputs"],
+        output_sections=get_output_sections(),
     )
 
 
@@ -302,6 +303,26 @@ def reformat():
     discord_text = format_discord(state["last_parsed"], state["classifications"], merged)
     video_text = format_video(state["last_parsed"], state["classifications"], merged)
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
+    return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
+
+
+@app.route("/quick_update", methods=["POST"])
+def quick_update():
+    """Renders a partial output from a chosen subset of sections.
+
+    Reuses the most recently fetched parsed data (same source as /reformat),
+    so run a Refresh first. Does NOT touch state["last_outputs"] — the quick
+    update is a side artifact and must not clobber the main draft.
+    """
+    if state["last_parsed"] is None:
+        return jsonify({"status": "error", "message": "No data — run Refresh first"}), 400
+    data = request.get_json() or {}
+    sections = data.get("sections")
+    if not isinstance(sections, list):
+        return jsonify({"status": "error", "message": "Missing sections list"}), 400
+    merged = _merged_flavor()
+    discord_text = format_discord(state["last_parsed"], state["classifications"], merged, sections=sections)
+    video_text = format_video(state["last_parsed"], state["classifications"], merged, sections=sections)
     return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
 
 

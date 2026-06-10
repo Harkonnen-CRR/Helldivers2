@@ -586,33 +586,41 @@ def _format_dss_video(dss):
     return lines
 
 
-def format_discord(parsed_data, classifications, flavor_texts=None):
-    """Formats parsed war data as Discord markdown.
+MAJOR_SEP = "================================================"
+MINOR_SEP = "------------------------------------------------"
 
-    Args:
-        parsed_data: dict from parse_all()
-        classifications: dict from classify_items()
-        flavor_texts: optional dict with "theaters" and "planets" sub-dicts
-    Returns:
-        str of Discord markdown with character count footer
-    """
-    flavor_texts = flavor_texts or {}
-    theater_flavors = flavor_texts.get("theaters", {})
-    planet_flavors = flavor_texts.get("planets", {})
+# Output sections in canonical render order. To add a new section: append its
+# key here, add a label in SECTION_LABELS, and write _section_<key>_discord and
+# _section_<key>_video helpers. Everything else (full output, quick update,
+# future Discord bot) picks it up automatically.
+SECTION_KEYS = ["orders", "fleetwide", "intel", "planets", "dss"]
+SECTION_LABELS = {
+    "orders": "Orders",
+    "fleetwide": "Fleetwide Equipment",
+    "intel": "Recent Intel",
+    "planets": "Planet Report",
+    "dss": "DSS Status",
+}
 
-    lines = []
+
+def get_output_sections():
+    """Returns the ordered section list (key + label) for UI/bot consumption."""
+    return [{"key": k, "label": SECTION_LABELS[k]} for k in SECTION_KEYS]
+
+
+# ── Discord section renderers — each returns a list of lines (empty if N/A) ──
+
+def _section_orders_discord(parsed_data, flavor_texts):
     orders = parsed_data.get("orders", [])
-    dss = parsed_data.get("dss")
-    dss_planet_index = dss["planet_index"] if dss else None
-
     visible_orders = [o for o in orders if _order_visible(o, flavor_texts)]
     manual_orders = [m for m in (flavor_texts.get("manual_orders") or []) if m.get("title", "").strip()]
+    if not (visible_orders or manual_orders):
+        return []
+    planet_index_to_name = _load_planet_index_to_name()
+    top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
+    mo_task_statuses = parsed_data.get("mo_task_statuses", {})
 
-    if visible_orders or manual_orders:
-        planet_index_to_name = _load_planet_index_to_name()
-        top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
-        mo_task_statuses = parsed_data.get("mo_task_statuses", {})
-
+    lines = []
     for i, order in enumerate(visible_orders):
         reward_label = _REWARD_TYPE_MAP.get(order["reward_type"], "Medals")
         title = _get_order_title(order, i, flavor_texts)
@@ -620,42 +628,58 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
         lines.append(f"> {order['briefing']}")
         if order.get("description"):
             lines.append(f"> {order['description']}")
-        lines.append(f"> **Reward:** {order['reward_amount']} {reward_label}")
+        if order.get("reward_amount") is not None:
+            lines.append(f"> **Reward:** {order['reward_amount']} {reward_label}")
         lines.append(f"> **Expires in:** {format_duration(_time_remaining_hours(order['expiration']))}")
         lines.append("> **Objectives:**")
         for task_idx, task in enumerate(order["tasks"]):
             status_info = _get_task_status_info(task, task_idx, order, mo_task_statuses, top_planets_by_index)
             lines.append(f">   • {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=True)}")
         lines.append("")
-
     for m in manual_orders:
         lines.append(f"**{m['title'].strip()}**")
         lines.append("")
+    return lines
 
+
+def _section_fleetwide_discord(parsed_data, flavor_texts):
     free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
-    if free_stratagems:
-        lines.append("**FLEETWIDE EQUIPMENT**")
-        for s in free_stratagems:
-            planets = s.get("planets") or []
-            planet_str = ", ".join(planets) if planets else "All active fronts"
-            lines.append(f"> **{s['name'].strip()}** — {planet_str}")
-        lines.append("")
+    if not free_stratagems:
+        return []
+    lines = ["**FLEETWIDE EQUIPMENT**"]
+    for s in free_stratagems:
+        planets = s.get("planets") or []
+        planet_str = ", ".join(planets) if planets else "All active fronts"
+        lines.append(f"> **{s['name'].strip()}** — {planet_str}")
+    lines.append("")
+    return lines
 
+
+def _section_intel_discord(parsed_data, flavor_texts):
     selected_ids = set(flavor_texts.get("selected_dispatches") or [])
     selected_dispatches = [d for d in (parsed_data.get("dispatches") or []) if d["id"] in selected_ids]
-    if selected_dispatches:
-        lines.append("**RECENT INTEL**")
-        for d in selected_dispatches:
-            age = d.get("age_label", "")
-            title = d.get("title", "")
-            body = d.get("body", "")
-            header = f"{title}  |  {age}" if age else title
-            lines.append(f"> **{header}**")
-            if body:
-                for bline in body.splitlines():
-                    if bline.strip():
-                        lines.append(f"> {bline.strip()}")
-        lines.append("")
+    if not selected_dispatches:
+        return []
+    lines = ["**RECENT INTEL**"]
+    for d in selected_dispatches:
+        age = d.get("age_label", "")
+        title = d.get("title", "")
+        body = d.get("body", "")
+        header = f"{title}  |  {age}" if age else title
+        lines.append(f"> **{header}**")
+        if body:
+            for bline in body.splitlines():
+                if bline.strip():
+                    lines.append(f"> {bline.strip()}")
+    lines.append("")
+    return lines
+
+
+def _section_planets_discord(parsed_data, classifications, flavor_texts):
+    theater_flavors = flavor_texts.get("theaters", {})
+    planet_flavors = flavor_texts.get("planets", {})
+    dss = parsed_data.get("dss")
+    dss_planet_index = dss["planet_index"] if dss else None
 
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
@@ -669,6 +693,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                 theaters[faction] = theaters[faction][:1]
     theater_order = [f for f in theater_order if f not in excluded]
 
+    lines = []
     for i, faction in enumerate(theater_order):
         if i > 0:
             lines.append("---")
@@ -765,49 +790,56 @@ def format_discord(parsed_data, classifications, flavor_texts=None):
                     lines.append(f"> **{r['name'].upper()}** ({size}{r['players']} Helldivers) — {pct}% cleared | {status_str}")
 
             lines.append("")
-
-    if dss:
-        lines.append("")
-        lines.extend(_format_dss_discord(dss))
-
-    return "\n".join(lines)
+    return lines
 
 
-def format_video(parsed_data, classifications, flavor_texts=None):
-    """Formats parsed war data as plain text for video scripts.
+def _section_dss_discord(parsed_data):
+    dss = parsed_data.get("dss")
+    if not dss:
+        return []
+    return ["", *_format_dss_discord(dss)]
+
+
+def format_discord(parsed_data, classifications, flavor_texts=None, sections=None):
+    """Formats parsed war data as Discord markdown.
 
     Args:
         parsed_data: dict from parse_all()
         classifications: dict from classify_items()
         flavor_texts: optional dict with "theaters" and "planets" sub-dicts
+        sections: optional list of section keys to include; default = all in canonical order
     Returns:
-        str of plain text with no markdown
+        str of Discord markdown
     """
     flavor_texts = flavor_texts or {}
-    theater_flavors = flavor_texts.get("theaters", {})
-    planet_flavors = flavor_texts.get("planets", {})
-
-    MAJOR_SEP = "================================================"
-    MINOR_SEP = "------------------------------------------------"
-
+    sections = SECTION_KEYS if sections is None else sections
+    renderers = {
+        "orders":    lambda: _section_orders_discord(parsed_data, flavor_texts),
+        "fleetwide": lambda: _section_fleetwide_discord(parsed_data, flavor_texts),
+        "intel":     lambda: _section_intel_discord(parsed_data, flavor_texts),
+        "planets":   lambda: _section_planets_discord(parsed_data, classifications, flavor_texts),
+        "dss":       lambda: _section_dss_discord(parsed_data),
+    }
     lines = []
+    for key in SECTION_KEYS:
+        if key in sections:
+            lines.extend(renderers[key]())
+    return "\n".join(lines)
+
+
+# ── Video section renderers — each returns a list of lines (empty if N/A) ──
+
+def _section_orders_video(parsed_data, flavor_texts):
     orders = parsed_data.get("orders", [])
-    dss = parsed_data.get("dss")
-    dss_planet_index = dss["planet_index"] if dss else None
-
-    lines.append(MAJOR_SEP)
-    lines.append("GALACTIC WAR UPDATE")
-    lines.append(MAJOR_SEP)
-    lines.append("")
-
     visible_orders = [o for o in orders if _order_visible(o, flavor_texts)]
     manual_orders = [m for m in (flavor_texts.get("manual_orders") or []) if m.get("title", "").strip()]
+    if not (visible_orders or manual_orders):
+        return []
+    planet_index_to_name = _load_planet_index_to_name()
+    top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
+    mo_task_statuses = parsed_data.get("mo_task_statuses", {})
 
-    if visible_orders or manual_orders:
-        planet_index_to_name = _load_planet_index_to_name()
-        top_planets_by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
-        mo_task_statuses = parsed_data.get("mo_task_statuses", {})
-
+    lines = []
     for i, order in enumerate(visible_orders):
         reward_label = _REWARD_TYPE_MAP.get(order["reward_type"], "Medals")
         title = _get_order_title(order, i, flavor_texts)
@@ -816,46 +848,58 @@ def format_video(parsed_data, classifications, flavor_texts=None):
         lines.append(f"    {order['briefing']}")
         if order.get("description"):
             lines.append(f"    {order['description']}")
-        lines.append(f"    Reward: {order['reward_amount']} {reward_label}")
+        if order.get("reward_amount") is not None:
+            lines.append(f"    Reward: {order['reward_amount']} {reward_label}")
         lines.append(f"    Expires in: {format_duration(_time_remaining_hours(order['expiration']))}")
         lines.append("    Objectives:")
         for task_idx, task in enumerate(order["tasks"]):
             status_info = _get_task_status_info(task, task_idx, order, mo_task_statuses, top_planets_by_index)
             lines.append(f"      - {_render_task_label(task, planet_index_to_name)}{_format_mo_task_status(status_info, discord=False)}")
         lines.append("")
-
     for m in manual_orders:
         lines.append(m["title"].strip())
         lines.append(MINOR_SEP)
         lines.append("")
+    return lines
 
+
+def _section_fleetwide_video(parsed_data, flavor_texts):
     free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
-    if free_stratagems:
-        lines.append(MAJOR_SEP)
-        lines.append("FLEETWIDE EQUIPMENT")
-        lines.append(MAJOR_SEP)
-        for s in free_stratagems:
-            planets = s.get("planets") or []
-            planet_str = ", ".join(planets) if planets else "All active fronts"
-            lines.append(f"  {s['name'].strip()} — {planet_str}")
-        lines.append("")
+    if not free_stratagems:
+        return []
+    lines = [MAJOR_SEP, "FLEETWIDE EQUIPMENT", MAJOR_SEP]
+    for s in free_stratagems:
+        planets = s.get("planets") or []
+        planet_str = ", ".join(planets) if planets else "All active fronts"
+        lines.append(f"  {s['name'].strip()} — {planet_str}")
+    lines.append("")
+    return lines
 
+
+def _section_intel_video(parsed_data, flavor_texts):
     selected_ids = set(flavor_texts.get("selected_dispatches") or [])
     selected_dispatches = [d for d in (parsed_data.get("dispatches") or []) if d["id"] in selected_ids]
-    if selected_dispatches:
-        lines.append(MAJOR_SEP)
-        lines.append("RECENT INTEL")
-        lines.append(MAJOR_SEP)
-        for d in selected_dispatches:
-            age = d.get("age_label", "")
-            title = d.get("title", "")
-            body = d.get("body", "")
-            lines.append(f"  [{age}] {title}" if age else f"  {title}")
-            if body:
-                for bline in body.splitlines():
-                    if bline.strip():
-                        lines.append(f"    {bline.strip()}")
-            lines.append("")
+    if not selected_dispatches:
+        return []
+    lines = [MAJOR_SEP, "RECENT INTEL", MAJOR_SEP]
+    for d in selected_dispatches:
+        age = d.get("age_label", "")
+        title = d.get("title", "")
+        body = d.get("body", "")
+        lines.append(f"  [{age}] {title}" if age else f"  {title}")
+        if body:
+            for bline in body.splitlines():
+                if bline.strip():
+                    lines.append(f"    {bline.strip()}")
+        lines.append("")
+    return lines
+
+
+def _section_planets_video(parsed_data, classifications, flavor_texts):
+    theater_flavors = flavor_texts.get("theaters", {})
+    planet_flavors = flavor_texts.get("planets", {})
+    dss = parsed_data.get("dss")
+    dss_planet_index = dss["planet_index"] if dss else None
 
     theater_order, theaters = _build_theaters(parsed_data)
     limits = flavor_texts.get("limits", {})
@@ -869,6 +913,7 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                 theaters[faction] = theaters[faction][:1]
     theater_order = [f for f in theater_order if f not in excluded]
 
+    lines = []
     for faction in theater_order:
         lines.append(MAJOR_SEP)
         display = _THEATER_DISPLAY.get(faction, faction.upper())
@@ -946,11 +991,40 @@ def format_video(parsed_data, classifications, flavor_texts=None):
                     lines.append(f"      {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
 
             lines.append("")
+    return lines
 
-    if dss:
-        lines.append(MAJOR_SEP)
-        lines.extend(_format_dss_video(dss))
 
+def _section_dss_video(parsed_data):
+    dss = parsed_data.get("dss")
+    if not dss:
+        return []
+    return [MAJOR_SEP, *_format_dss_video(dss)]
+
+
+def format_video(parsed_data, classifications, flavor_texts=None, sections=None):
+    """Formats parsed war data as plain text for video scripts.
+
+    Args:
+        parsed_data: dict from parse_all()
+        classifications: dict from classify_items()
+        flavor_texts: optional dict with "theaters" and "planets" sub-dicts
+        sections: optional list of section keys to include; default = all in canonical order
+    Returns:
+        str of plain text with no markdown
+    """
+    flavor_texts = flavor_texts or {}
+    sections = SECTION_KEYS if sections is None else sections
+    lines = [MAJOR_SEP, "GALACTIC WAR UPDATE", MAJOR_SEP, ""]
+    renderers = {
+        "orders":    lambda: _section_orders_video(parsed_data, flavor_texts),
+        "fleetwide": lambda: _section_fleetwide_video(parsed_data, flavor_texts),
+        "intel":     lambda: _section_intel_video(parsed_data, flavor_texts),
+        "planets":   lambda: _section_planets_video(parsed_data, classifications, flavor_texts),
+        "dss":       lambda: _section_dss_video(parsed_data),
+    }
+    for key in SECTION_KEYS:
+        if key in sections:
+            lines.extend(renderers[key]())
     return "\n".join(lines)
 
 

@@ -346,6 +346,16 @@
     button.flavor-undo-btn { border-color: #3a3a00; color: #888; }
     button.flavor-undo-btn:hover { border-color: #888; color: #f0c040; }
 
+    .qu-section-cb {
+      display: flex; align-items: center; gap: 6px; font-size: 12px; color: #c8c8c8; cursor: pointer;
+    }
+    .qu-section-cb input { cursor: pointer; accent-color: #f0c040; }
+    button.qu-toggle-btn {
+      background: none; border: 1px solid #333; border-radius: 3px; color: #888;
+      font-size: 11px; padding: 3px 10px; cursor: pointer; font-family: 'Courier New', monospace;
+    }
+    button.qu-toggle-btn:hover { border-color: #666; color: #ccc; }
+
     /* Output panels */
     .outputs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
@@ -780,6 +790,46 @@
         </div>
       </div>
       <textarea class="output-textarea" id="out-video" spellcheck="false">{% if outputs %}{{ outputs.video }}{% endif %}</textarea>
+    </div>
+  </div>
+
+  <!-- Quick Update -->
+  <div class="section" id="quick-update-section">
+    <div class="modifiers-header" onclick="toggleSection('quick-update-body', 'quick-update-icon')">
+      <h3 style="margin:0">Quick Update</h3>
+      <span class="toggle-icon" id="quick-update-icon">▼</span>
+    </div>
+    <div id="quick-update-body" style="display:none">
+      <div style="font-size:12px;color:#888;margin-bottom:8px">
+        Build a cut-down post from just the sections you pick — e.g. a new MO dropping after the daily is already out. Uses the latest fetched data; run Refresh first.
+      </div>
+      <div id="qu-section-list" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px">
+        {% for s in output_sections %}
+        <label class="qu-section-cb"><input type="checkbox" value="{{ s.key }}" checked> {{ s.label }}</label>
+        {% endfor %}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <button class="secondary" onclick="generateQuickUpdate()">⚡ Generate</button>
+        <button class="qu-toggle-btn" onclick="setAllQuSections(true)">All On</button>
+        <button class="qu-toggle-btn" onclick="setAllQuSections(false)">All Off</button>
+        <span id="qu-status" style="font-size:11px;color:#888"></span>
+      </div>
+      <div class="outputs-row">
+        <div class="section" style="margin:0">
+          <div class="output-toolbar" style="position:relative">
+            <h3 style="margin:0;font-size:13px">Quick Discord</h3>
+            <button class="copy-btn" onclick="copyOutput('qu-discord')" style="margin-left:auto">Copy</button>
+          </div>
+          <textarea class="output-textarea" id="out-qu-discord" spellcheck="false" placeholder="Pick sections and click Generate."></textarea>
+        </div>
+        <div class="section" style="margin:0">
+          <div class="output-toolbar" style="position:relative">
+            <h3 style="margin:0;font-size:13px">Quick Video Script</h3>
+            <button class="copy-btn" onclick="copyOutput('qu-video')" style="margin-left:auto">Copy</button>
+          </div>
+          <textarea class="output-textarea" id="out-qu-video" spellcheck="false" placeholder="Pick sections and click Generate."></textarea>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1937,6 +1987,40 @@
       ta.select();
       document.execCommand('copy');
     }
+  }
+
+  // ── Quick Update ──────────────────────────────────────────────
+
+  function setAllQuSections(on) {
+    document.querySelectorAll('#qu-section-list input[type="checkbox"]').forEach(cb => cb.checked = on);
+  }
+
+  async function generateQuickUpdate() {
+    const sections = Array.from(
+      document.querySelectorAll('#qu-section-list input[type="checkbox"]:checked')
+    ).map(cb => cb.value);
+
+    const status = document.getElementById('qu-status');
+    status.textContent = 'Generating...';
+    let res, data;
+    try {
+      res = await fetch('/quick_update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections }),
+      });
+      data = await res.json();
+    } catch (e) {
+      status.textContent = '⚠ Network error';
+      return;
+    }
+    if (data.status !== 'ok') {
+      status.textContent = '⚠ ' + (data.message || 'Failed');
+      return;
+    }
+    document.getElementById('out-qu-discord').value = data.discord;
+    document.getElementById('out-qu-video').value = data.video;
+    status.textContent = sections.length ? `${sections.length} section(s)` : 'Empty — no sections selected';
   }
 
   // ── Char counter ──────────────────────────────────────────────
