@@ -356,6 +356,14 @@
     }
     button.qu-toggle-btn:hover { border-color: #666; color: #ccc; }
 
+    .effect-row { display:flex; align-items:center; gap:8px; padding:4px 0; border-bottom:1px solid #161616; }
+    .effect-row .eff-name { flex:0 0 190px; font-size:11px; color:#bbb; font-family:'Courier New',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .effect-row input.eff-text { flex:1; min-width:80px; background:#111; border:1px solid #2a2a2a; color:#c8c8c8; border-radius:3px; font-size:11px; padding:3px 6px; font-family:'Courier New',monospace; }
+    .effect-row input.eff-text:focus { outline:none; border-color:#444; }
+    .effect-row .eff-planets { flex:0 0 auto; font-size:10px; color:#555; white-space:nowrap; cursor:help; }
+    .effect-row .eff-enable input { accent-color:#f0c040; cursor:pointer; }
+    .effect-unknown .eff-id { flex:0 0 70px; color:#c8a000; font-family:'Courier New',monospace; font-size:11px; }
+
     /* Output panels */
     .outputs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
@@ -667,6 +675,23 @@
     </div>
   </div>
 
+  <!-- Planet Effects (auto-detected) -->
+  <div class="section" id="effects-section">
+    <div class="modifiers-header" onclick="toggleSection('effects-body', 'effects-icon')">
+      <h3 style="margin:0">Planet Effects</h3>
+      <span class="toggle-icon" id="effects-icon">▼</span>
+    </div>
+    <div id="effects-body" style="display:none">
+      <div style="font-size:12px;color:#888;margin-bottom:8px">
+        Auto-detected from the API. Known effects apply to the output automatically — set the display text once and it's remembered everywhere that effect appears. Galaxy-wide (all planets, not just the ones in the update).
+      </div>
+      <div class="mod-subsection-label">Formatting (known effects)</div>
+      <div id="effects-known-list"><div class="no-hazards">Run Refresh to load effects.</div></div>
+      <div class="mod-subsection-label" style="margin-top:12px">⚑ Unknown effect IDs (not in output until labeled)</div>
+      <div id="effects-unknown-list"><div class="no-hazards">None detected.</div></div>
+    </div>
+  </div>
+
   <!-- Free Stratagems Panel -->
   <div class="section" id="strats-section">
     <div class="modifiers-header" onclick="toggleSection('strats-body', 'strats-icon')">
@@ -880,6 +905,7 @@
     hideApiDot();
     updateClassificationPanel(data.items);
     buildModifierPanel(data.modifier_panel, data.flavor);
+    buildEffectsPanel(data.effects_panel);
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
     buildOrdersPanel(data.orders || [], data.flavor);
@@ -941,6 +967,7 @@
     updateCharCount();
     document.getElementById('reformat-btn').style.display = 'inline-block';
     buildModifierPanel(data.modifier_panel, data.flavor);
+    buildEffectsPanel(data.effects_panel);
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
     buildOrdersPanel(data.orders || [], data.flavor);
@@ -1321,6 +1348,63 @@
   // ── Modifier panel (Special Factions + Custom Modifiers) ─────
 
   let _activePlanetNames = [];
+
+  function buildEffectsPanel(panel) {
+    panel = panel || { known: [], unknown: [] };
+    const knownList = document.getElementById('effects-known-list');
+    const unkList = document.getElementById('effects-unknown-list');
+    if (!knownList || !unkList) return;
+    knownList.innerHTML = '';
+    unkList.innerHTML = '';
+
+    if (!panel.known || !panel.known.length) {
+      knownList.innerHTML = '<div class="no-hazards">No known effects detected.</div>';
+    } else {
+      for (const e of panel.known) knownList.appendChild(buildEffectRow(e, false));
+    }
+    if (!panel.unknown || !panel.unknown.length) {
+      unkList.innerHTML = '<div class="no-hazards">None detected.</div>';
+    } else {
+      for (const e of panel.unknown) unkList.appendChild(buildEffectRow(e, true));
+    }
+  }
+
+  function buildEffectRow(e, isUnknown) {
+    const row = document.createElement('div');
+    row.className = 'effect-row' + (isUnknown ? ' effect-unknown' : '');
+    const planets = (e.planets || []).join(', ');
+    const owners = (e.owners || []).join('/');
+    const count = (e.planets || []).length;
+    if (isUnknown) {
+      row.innerHTML = `
+        <span class="eff-id">${e.id}</span>
+        <input class="eff-text" type="text" placeholder="Label this ID to use it in output..." value="${escHtml(e.text || '')}">
+        <span class="eff-planets" title="${escHtml(planets)}">${count}p ${escHtml(owners)}</span>`;
+      const input = row.querySelector('.eff-text');
+      input.addEventListener('input', () => saveEffectFormat(e.id, input.value, true));
+    } else {
+      row.innerHTML = `
+        <label class="eff-enable" title="Show in output"><input type="checkbox" ${e.enabled !== false ? 'checked' : ''}></label>
+        <span class="eff-name" title="ID ${e.id}">${escHtml(e.name)}</span>
+        <input class="eff-text" type="text" placeholder="${escHtml(e.name)}" value="${escHtml(e.text || '')}">
+        <span class="eff-planets" title="${escHtml(planets)}">${count}p</span>`;
+      const input = row.querySelector('.eff-text');
+      const cb = row.querySelector('input[type="checkbox"]');
+      const save = () => saveEffectFormat(e.id, input.value, cb.checked);
+      input.addEventListener('input', save);
+      cb.addEventListener('change', save);
+    }
+    return row;
+  }
+
+  function saveEffectFormat(id, text, enabled) {
+    fetch('/save_effect_format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, text, enabled }),
+    });
+    scheduleReformat();
+  }
 
   function buildModifierPanel(modPanel, flavor) {
     if (!modPanel) return;

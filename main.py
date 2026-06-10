@@ -7,7 +7,7 @@ from flask import Flask, jsonify, render_template, request
 
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all
-from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data
 
 app = Flask(__name__)
 
@@ -228,6 +228,7 @@ def refresh():
         "items": items_with_state,
         "theaters": theaters,
         "modifier_panel": modifier_panel,
+        "effects_panel": get_effects_panel_data(parsed, merged),
         "dispatches": parsed.get("dispatches", []),
         "orders": parsed.get("orders", []),
         "flavor": merged,
@@ -289,6 +290,7 @@ def fetch2():
         "video": video_text,
         "theaters": theaters,
         "modifier_panel": modifier_panel,
+        "effects_panel": get_effects_panel_data(parsed, merged),
         "dispatches": parsed.get("dispatches", []),
         "orders": parsed.get("orders", []),
         "flavor": merged,
@@ -390,6 +392,25 @@ def save_manual_orders():
     state["session"]["manual_orders"] = [
         m for m in orders if isinstance(m, dict) and m.get("title", "").strip()
     ]
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_effect_format", methods=["POST"])
+def save_effect_format():
+    """Persists per-effect display formatting (define once, auto-applies everywhere).
+    Empty text + enabled reverts to default (community label) by removing the entry."""
+    data = request.get_json()
+    eid = data.get("id")
+    if eid is None:
+        return jsonify({"status": "error", "message": "Missing id"}), 400
+    text = (data.get("text") or "").strip()
+    enabled = bool(data.get("enabled", True))
+    state["flavor"].setdefault("effect_formats", {})
+    if not text and enabled:
+        state["flavor"]["effect_formats"].pop(str(eid), None)  # back to default
+    else:
+        state["flavor"]["effect_formats"][str(eid)] = {"text": text, "enabled": enabled}
+    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 

@@ -332,5 +332,6 @@ def parse_all():
         "mo_task_statuses": _build_mo_task_statuses(assignments_data, planets_data, campaigns_by_index),
         "dss": _build_dss(dss_data),
         "dispatches": _build_dispatches(dispatches_data),
+        "all_effects_by_index": effects_by_index,  # galaxy-wide, for the effects editor/flag area
         "meta": {"impact_multiplier": impact_multiplier},
     }

@@ -1183,6 +1183,47 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
     return result
 
 
+def get_effects_panel_data(parsed_data, flavor):
+    """Galaxy-wide effects for the formatting editor + unknown flag area.
+    Distinct effects across ALL planets (not just shown), split known/unknown,
+    each with its current format state and the planets carrying it."""
+    formats = (flavor or {}).get("effect_formats", {})
+    effects_by_index = parsed_data.get("all_effects_by_index", {})
+    try:
+        with open(os.path.join("data", "planets.json")) as f:
+            meta = {p["index"]: {"name": p["name"], "owner": p["currentOwner"]} for p in json.load(f)}
+    except (FileNotFoundError, json.JSONDecodeError):
+        meta = {}
+
+    seen = {}
+    for idx, effects in effects_by_index.items():
+        pname = meta.get(idx, {}).get("name", f"#{idx}")
+        powner = meta.get(idx, {}).get("owner", "")
+        for e in effects:
+            eid = e["id"]
+            entry = seen.get(eid)
+            if not entry:
+                fmt = formats.get(str(eid), {})
+                entry = {
+                    "id": eid, "name": e["name"], "description": e.get("description", ""),
+                    "known": e["known"], "planets": [],
+                    "text": fmt.get("text", ""), "enabled": fmt.get("enabled", True),
+                }
+                seen[eid] = entry
+            if pname not in entry["planets"]:
+                entry["planets"].append(pname)
+                entry.setdefault("owners", set()).add(powner)
+
+    out = []
+    for e in sorted(seen.values(), key=lambda x: x["id"]):
+        e["owners"] = sorted(o for o in e.pop("owners", set()) if o)
+        out.append(e)
+    return {
+        "known": [e for e in out if e["known"]],
+        "unknown": [e for e in out if not e["known"]],
+    }
+
+
 def get_modifier_panel_data(parsed_data, flavor):
     """Returns data for the consolidated Gameplay Modifiers panel.
 
