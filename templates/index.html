@@ -227,7 +227,7 @@
     .ref-planet.automaton .ref-planet-name { color: #e09090; }
     .ref-planet.illuminate .ref-planet-name { color: #c0a0e8; }
     .ref-planet.humans     .ref-planet-name { color: #60c0f0; }
-    .ref-planet-name.is-mo { color: #f0c040 !important; }
+    .mo-star { color: #f0c040; }  /* Super-Earth gold MO marker; name keeps its faction color */
     .ref-planet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
     .planet-show-toggle {
       display: flex; align-items: center; gap: 4px; font-size: 10px;
@@ -2382,7 +2382,6 @@
     const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate', Humans: 'humans' }[theater.faction] || '';
 
     for (const p of theater.planets) {
-      const moTag = p.is_mo ? ' is-mo' : '';
       const hazardLines = p.hazards.map(h =>
         `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — <em>' + escHtml(h.description) + '</em>' : ''}</div>`
       ).join('');
@@ -2401,7 +2400,7 @@
       html += `
         <div class="ref-planet${factionClass ? ' ' + factionClass : ''}${p.visible === false ? ' planet-hidden' : ''}" data-planet-index="${p.index}">
           <div class="ref-planet-head">
-            <div class="ref-planet-name${moTag}">${escHtml(p.name)}${p.is_mo ? ' ★' : ''}</div>
+            <div class="ref-planet-name">${escHtml(p.name)}${p.is_mo ? ' <span class="mo-star">★</span>' : ''}</div>
             <label class="planet-show-toggle"><input type="checkbox" class="planet-visible-cb" ${p.visible === false ? '' : 'checked'} onchange="savePlanetVisibility(${p.index}, this.checked)"> Show</label>
           </div>
           <div class="ref-planet-stat"><strong>${p.player_count.toLocaleString()} players</strong> &nbsp;|&nbsp; ${p.is_defense ? 'Defense' : 'Liberation'}: <strong>${p.progress_pct}%</strong> &nbsp;|&nbsp; ${escHtml(p.time_status)}</div>
