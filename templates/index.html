@@ -233,6 +233,12 @@
       display: flex; align-items: center; gap: 4px; font-size: 10px;
       color: #888; white-space: nowrap; cursor: pointer; flex-shrink: 0;
     }
+    .pinned-tag { font-size: 9px; color: #8a8ab0; font-weight: normal; letter-spacing: 0; }
+    .unpin-btn {
+      font-size: 10px; background: #1a1a2a; color: #99a; border: 1px solid #3a3a5a;
+      border-radius: 3px; padding: 1px 7px; cursor: pointer; white-space: nowrap;
+    }
+    .unpin-btn:hover { background: #26263a; border-color: #5a5a7a; }
     .ref-planet.planet-hidden { opacity: 0.45; }
     .ref-planet.planet-hidden .ref-planet-name::after {
       content: ' (hidden)'; font-size: 10px; color: #888; font-weight: normal; letter-spacing: 0;
@@ -878,6 +884,16 @@
              onchange="saveGlobalLimit(this.value)">
       <span style="font-size:10px;color:#555">(0 = no limit · all 3 fronts always included)</span>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <label style="font-size:12px;color:#888">Look up planet:</label>
+      <input type="text" id="planet-search-input" list="planet-search-list" placeholder="any planet name…"
+             style="width:200px;background:#111;border:1px solid #2a2a2a;color:#c8c8c8;border-radius:3px;padding:3px 7px;font-size:12px"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();pinSearchedPlanet();}">
+      <datalist id="planet-search-list"></datalist>
+      <button onclick="pinSearchedPlanet()"
+              style="background:#1a1a2a;border:1px solid #3a3a5a;color:#aab;border-radius:3px;padding:3px 10px;font-size:11px;cursor:pointer">📌 Pin to theater</button>
+      <span style="font-size:10px;color:#555">(reference any of the 269 planets in its theater; toggle Show to broadcast it)</span>
+    </div>
     <div id="flavor-fleetwide-equipment" class="flavor-fleetwide-equipment" style="display:none"></div>
     <div id="theater-cards"></div>
     <!-- Special Events Log (archive of cleared events) -->
@@ -1039,6 +1055,7 @@
     buildSpecialEventsPanel(data.orders || [], data.flavor);
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
     buildFlavorEditor(data.theaters, data.flavor);
+    populatePlanetSearch(data.all_planets);
     startCountdown();
   }
 
@@ -1505,6 +1522,54 @@
     scheduleReformat();
     btn.textContent = '✓ Inserted';
     setTimeout(() => { btn.textContent = '→ Insert'; }, 1200);
+  }
+
+  // ── Planet search + pin (reference/broadcast any of the 269 planets) ────────
+  let planetSearchByName = {};   // lowercased name -> index
+
+  function populatePlanetSearch(allPlanets) {
+    planetSearchByName = {};
+    const dl = document.getElementById('planet-search-list');
+    if (!dl) return;
+    dl.innerHTML = (allPlanets || []).map(p => {
+      planetSearchByName[p.name.toLowerCase()] = p.index;
+      return `<option value="${escHtml(p.name)}"></option>`;
+    }).join('');
+  }
+
+  async function pinSearchedPlanet() {
+    const input = document.getElementById('planet-search-input');
+    const name = (input.value || '').trim().toLowerCase();
+    if (!name) return;
+    const index = planetSearchByName[name];
+    if (index === undefined) { setStatus(`No planet named "${input.value}".`); return; }
+    const res = await fetch('/pin_planet', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index }),
+    });
+    const data = await res.json();
+    if (data.status !== 'ok') { setStatus(data.message || 'Could not pin planet.'); return; }
+    input.value = '';
+    applyPinResponse(data);
+  }
+
+  async function unpinPlanet(index) {
+    const res = await fetch('/unpin_planet', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index }),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') applyPinResponse(data);
+  }
+
+  // Re-render the editor + output boxes from a /pin or /unpin response.
+  function applyPinResponse(data) {
+    if (data.theaters) buildFlavorEditor(data.theaters, data.flavor);
+    if (typeof data.discord === 'string') {
+      document.getElementById('out-discord').value = data.discord;
+      document.getElementById('out-video').value = data.video;
+      updateCharCount();
+    }
   }
 
   function addManualOrder() {
@@ -2371,7 +2436,7 @@
       // Right: reference panel
       const refPanel = document.createElement('div');
       refPanel.className = 'ref-panel';
-      refPanel.innerHTML = buildRefPanelHTML(theater, flavor && flavor.planet_notes);
+      refPanel.innerHTML = buildRefPanelHTML(theater, flavor && flavor.planet_notes, (flavor && flavor.pinned_planets) || []);
 
       // Planet flavor section — lives inside the write panel, below the theater textarea
       const planetSection = document.createElement('div');
@@ -2463,8 +2528,9 @@
     ta.after(bar);
   }
 
-  function buildRefPanelHTML(theater, planetNotes) {
+  function buildRefPanelHTML(theater, planetNotes, pinnedPlanets) {
     let html = '';
+    pinnedPlanets = pinnedPlanets || [];
     const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate', Humans: 'humans' }[theater.faction] || '';
 
     for (const p of theater.planets) {
@@ -2486,8 +2552,11 @@
       html += `
         <div class="ref-planet${factionClass ? ' ' + factionClass : ''}${p.visible === false ? ' planet-hidden' : ''}" data-planet-index="${p.index}">
           <div class="ref-planet-head">
-            <div class="ref-planet-name">${escHtml(p.name)}${p.is_mo ? ' <span class="mo-star">★</span>' : ''}</div>
-            <label class="planet-show-toggle"><input type="checkbox" class="planet-visible-cb" ${p.visible === false ? '' : 'checked'} onchange="savePlanetVisibility(${p.index}, this.checked)"> Show</label>
+            <div class="ref-planet-name">${escHtml(p.name)}${p.is_mo ? ' <span class="mo-star">★</span>' : ''}${pinnedPlanets.includes(p.index) ? ' <span class="pinned-tag">📌 pinned</span>' : ''}</div>
+            <span style="display:flex;align-items:center;gap:8px">
+              ${pinnedPlanets.includes(p.index) ? `<button class="unpin-btn" onclick="unpinPlanet(${p.index})">Unpin</button>` : ''}
+              <label class="planet-show-toggle"><input type="checkbox" class="planet-visible-cb" ${p.visible === false ? '' : 'checked'} onchange="savePlanetVisibility(${p.index}, this.checked)"> Show</label>
+            </span>
           </div>
           <div class="ref-planet-stat"><strong>${p.player_count.toLocaleString()} players</strong> &nbsp;|&nbsp; ${p.is_defense ? 'Defense' : 'Liberation'}: <strong>${p.progress_pct}%</strong> &nbsp;|&nbsp; ${escHtml(p.time_status)}</div>
           ${(p.sector || p.biome) ? `<div class="ref-planet-stat">${p.sector ? `Sector: <strong>${escHtml(p.sector)}</strong>` : ''}${p.sector && p.biome ? ' &nbsp;|&nbsp; ' : ''}${p.biome ? `Biome: <strong>${escHtml(p.biome)}</strong>` : ''}</div>` : ''}

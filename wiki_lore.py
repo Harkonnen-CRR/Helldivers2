@@ -198,7 +198,12 @@ def get_planet_lore(index, refresh=False):
     key = str(index)
     if not refresh and key in cache:
         return cache[key]
-    data = _fetch_into(index, cache, _load_pagename_map())
+    pagenames = _load_pagename_map()
+    if index not in pagenames:
+        # Planet new since our last map pull (e.g. added in a game patch) — refresh once so
+        # newly-added planets resolve without manual intervention.
+        pagenames = _load_pagename_map(refresh=True)
+    data = _fetch_into(index, cache, pagenames)
     if data is not None:
         _save_lore_cache(cache)
     return data

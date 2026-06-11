@@ -8,7 +8,7 @@ from flask import Flask, jsonify, render_template, request
 
 import wiki_lore
 from api_client import fetch_all, ping, ApiError
-from data_parser import parse_all
+from data_parser import parse_all, build_planet_by_index, list_all_planets
 from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data
 
 app = Flask(__name__)
@@ -25,6 +25,7 @@ _SESSION_DEFAULTS = {
     "selected_dispatches": [],
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
     "planet_visibility": {},  # {str(planet_index): bool} — True by default (per-planet show/hide)
+    "pinned_planets": [],     # [int index] searched planets pinned into their theater (editor+output)
     "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
@@ -208,6 +209,46 @@ def index():
     )
 
 
+def _with_pins(parsed):
+    """Return parsed with the session's pinned planets appended to its planet set (deduped),
+    so pins show in the editor AND output (subject to per-planet show/hide). Non-mutating —
+    last_parsed stays the pure parse, so unpinning just re-derives without them. Pinned planets
+    carry no live liberation rate (that needs the two-snapshot flow); they are reference pulls."""
+    pins = state["session"].get("pinned_planets") or []
+    if not parsed or not pins:
+        return parsed
+    have = {p["index"] for p in parsed["planets"]}
+    extra = []
+    for idx in pins:
+        if idx in have:
+            continue
+        bp = build_planet_by_index(idx)
+        if bp:
+            bp["pinned"] = True
+            extra.append(bp)
+    if not extra:
+        return parsed
+    out = dict(parsed)
+    out["planets"] = parsed["planets"] + extra
+    return out
+
+
+def _pinned_response():
+    """Rebuild the editor theaters + output from last_parsed with current pins applied —
+    the payload returned by /pin_planet and /unpin_planet so the UI updates in place."""
+    merged = _merged_flavor()
+    pp = _with_pins(state["last_parsed"])
+    theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}),
+                                planet_visibility=merged.get("planet_visibility", {}))
+    return {
+        "status": "ok",
+        "theaters": theaters,
+        "discord": format_discord(pp, state["classifications"], merged),
+        "video": format_video(pp, state["classifications"], merged),
+        "flavor": merged,
+    }
+
+
 @app.route("/refresh", methods=["POST"])
 def refresh():
     try:
@@ -248,7 +289,7 @@ def refresh():
     }
 
     merged = _merged_flavor()
-    theaters = get_theater_data(parsed, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
+    theaters = get_theater_data(_with_pins(parsed), state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
     modifier_panel = get_modifier_panel_data(parsed, merged)
 
     return jsonify({
@@ -259,6 +300,7 @@ def refresh():
         "effects_panel": get_effects_panel_data(parsed, merged),
         "dispatches": parsed.get("dispatches", []),
         "orders": parsed.get("orders", []),
+        "all_planets": list_all_planets(),
         "flavor": merged,
     })
 
@@ -306,10 +348,11 @@ def fetch2():
 
     state["last_parsed"] = parsed
     merged = _merged_flavor()
-    theaters = get_theater_data(parsed, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
+    pp = _with_pins(parsed)
+    theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
     modifier_panel = get_modifier_panel_data(parsed, merged)
-    discord_text = format_discord(parsed, state["classifications"], merged)
-    video_text = format_video(parsed, state["classifications"], merged)
+    discord_text = format_discord(pp, state["classifications"], merged)
+    video_text = format_video(pp, state["classifications"], merged)
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
 
     return jsonify({
@@ -330,8 +373,9 @@ def reformat():
     if state["last_parsed"] is None:
         return jsonify({"status": "error", "message": "No data — run Refresh first"}), 400
     merged = _merged_flavor()
-    discord_text = format_discord(state["last_parsed"], state["classifications"], merged)
-    video_text = format_video(state["last_parsed"], state["classifications"], merged)
+    pp = _with_pins(state["last_parsed"])
+    discord_text = format_discord(pp, state["classifications"], merged)
+    video_text = format_video(pp, state["classifications"], merged)
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
     return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
 
@@ -351,8 +395,9 @@ def quick_update():
     if not isinstance(sections, list):
         return jsonify({"status": "error", "message": "Missing sections list"}), 400
     merged = _merged_flavor()
-    discord_text = format_discord(state["last_parsed"], state["classifications"], merged, sections=sections)
-    video_text = format_video(state["last_parsed"], state["classifications"], merged, sections=sections)
+    pp = _with_pins(state["last_parsed"])
+    discord_text = format_discord(pp, state["classifications"], merged, sections=sections)
+    video_text = format_video(pp, state["classifications"], merged, sections=sections)
     return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
 
 
@@ -447,6 +492,38 @@ def planet_lore():
         return jsonify({"status": "ok", "pagename": None, "entries": []})
     return jsonify({"status": "ok", "pagename": lore.get("pagename"),
                     "entries": lore.get("entries", [])})
+
+
+@app.route("/pin_planet", methods=["POST"])
+def pin_planet():
+    """Pin ANY galaxy planet into its theater (editor + output, subject to show/hide).
+    Returns the rebuilt theaters + output so the UI updates in place."""
+    index = request.get_json().get("index")
+    if index is None:
+        return jsonify({"status": "error", "message": "Missing index"}), 400
+    index = int(index)
+    if build_planet_by_index(index) is None:
+        return jsonify({"status": "error", "message": "Unknown planet index"}), 400
+    pins = state["session"]["pinned_planets"]
+    if index not in pins:
+        pins.append(index)
+    if state["last_parsed"] is None:
+        return jsonify({"status": "ok"})  # nothing to rebuild yet; next refresh will include it
+    return jsonify(_pinned_response())
+
+
+@app.route("/unpin_planet", methods=["POST"])
+def unpin_planet():
+    index = request.get_json().get("index")
+    if index is None:
+        return jsonify({"status": "error", "message": "Missing index"}), 400
+    index = int(index)
+    pins = state["session"]["pinned_planets"]
+    if index in pins:
+        pins.remove(index)
+    if state["last_parsed"] is None:
+        return jsonify({"status": "ok"})
+    return jsonify(_pinned_response())
 
 
 @app.route("/save_manual_orders", methods=["POST"])
