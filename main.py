@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 from flask import Flask, jsonify, render_template, request
 
+import wiki_lore
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all
 from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data
@@ -427,6 +428,25 @@ def save_planet_visibility():
     else:
         vis[str(index)] = False
     return jsonify({"status": "ok"})
+
+
+@app.route("/planet_lore", methods=["POST"])
+def planet_lore():
+    """On-demand Layer-B wiki lore for one planet (the editor's reference panel). Lazy +
+    cached in wiki_lore; NEVER part of refresh or the output — reference only until the user
+    explicitly inserts an entry into a flavor box."""
+    data = request.get_json()
+    index = data.get("index")
+    if index is None:
+        return jsonify({"status": "error", "message": "Missing index"}), 400
+    try:
+        lore = wiki_lore.get_planet_lore(int(index))
+    except Exception as e:  # live wiki fetch — fail soft so the editor just shows a notice
+        return jsonify({"status": "error", "message": f"Wiki fetch failed: {e}"}), 200
+    if not lore:
+        return jsonify({"status": "ok", "pagename": None, "entries": []})
+    return jsonify({"status": "ok", "pagename": lore.get("pagename"),
+                    "entries": lore.get("entries", [])})
 
 
 @app.route("/save_manual_orders", methods=["POST"])
