@@ -327,19 +327,6 @@
     .ref-planet.terminid  .planet-notes-label { color: #6a5a20; border-top-color: #2a2010; }
     .ref-planet.automaton .planet-notes-label { color: #6a3030; border-top-color: #2a1414; }
     .ref-planet.illuminate .planet-notes-label { color: #503a80; border-top-color: #1e1430; }
-    textarea.planet-notes-input {
-      width: 100%;
-      height: 60px;
-      background: #111;
-      border: 1px solid #2a2a2a;
-      border-radius: 2px;
-      color: #b0b0b0;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      padding: 5px 7px;
-      resize: vertical;
-    }
-    textarea.planet-notes-input:focus { outline: none; border-color: #444; }
 
     /* Planet flavor text list */
     .planet-flavor-section { margin-top: 10px; border-top: 1px solid #1e1e1e; padding-top: 8px; }
@@ -897,6 +884,8 @@
       <datalist id="planet-search-list"></datalist>
       <button onclick="pinSearchedPlanet()"
               style="background:#1a1a2a;border:1px solid #3a3a5a;color:#aab;border-radius:3px;padding:3px 10px;font-size:11px;cursor:pointer">📌 Pin to theater</button>
+      <button onclick="restoreTop5()"
+              style="background:#16221a;border:1px solid #2a4a35;color:#9c9;border-radius:3px;padding:3px 10px;font-size:11px;cursor:pointer">↺ Restore top 5</button>
       <span style="font-size:10px;color:#555">(reference any of the 269 planets in its theater; toggle Show to broadcast it)</span>
     </div>
     <div id="flavor-fleetwide-equipment" class="flavor-fleetwide-equipment" style="display:none"></div>
@@ -1578,6 +1567,20 @@
       setStatus('Taken off the board. (Re-add any planet via the Look up box.)');
     } catch (e) {
       setStatus('Remove failed — see server log.');
+    }
+  }
+
+  async function restoreTop5() {
+    setStatus('Restoring top 5…');
+    try {
+      const res = await fetch('/restore_top5', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      if (data.status !== 'ok') { setStatus(data.message || 'Could not restore.'); return; }
+      applyPinResponse(data);
+      setStatus(data.theaters ? 'Top 5 most-populated planets restored to the board.'
+                              : 'Top 5 restored — run Calculations to display.');
+    } catch (e) {
+      setStatus('Restore failed — see server log.');
     }
   }
 
@@ -2421,7 +2424,7 @@
       const header = document.createElement('div');
       header.className = 'theater-card-header' + (isExcluded ? ' theater-excluded' : '');
       header.innerHTML = `
-        <span style="${isExcluded ? 'opacity:0.45;text-decoration:line-through' : ''}">${theaterDisplayName} FRONT</span>
+        <span style="${isExcluded ? 'opacity:0.45;text-decoration:line-through' : ''}">${theaterDisplayName}${faction === 'Humans' ? '' : ' FRONT'}</span>
         <span style="display:flex;align-items:center;gap:12px">
           <label onclick="event.stopPropagation()" style="font-size:11px;color:#888;font-weight:normal;cursor:pointer">
             <input type="checkbox" ${isExcluded ? 'checked' : ''} onchange="saveTheaterExclude('${escHtml(faction)}', this.checked, this)" style="accent-color:#c05050;cursor:pointer">
@@ -2565,7 +2568,6 @@
       const hazardLines = p.hazards.map(h =>
         `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — <em>' + escHtml(h.description) + '</em>' : ''}</div>`
       ).join('');
-      const savedNote = (planetNotes && planetNotes[p.name]) ? planetNotes[p.name] : '';
       const regionLines = (p.regions && p.regions.length) ? p.regions.map(r => {
         const avail = r.is_available ? '✓' : '✗';
         const iconColor = r.is_available ? '#50c050' : '#c05050';
@@ -2591,8 +2593,6 @@
           ${p.biome_description ? `<div class="ref-planet-hazards">${escHtml(p.biome_description)}</div>` : ''}
           ${hazardLines}
           ${regionLines ? `<div class="planet-notes-label">Population Centers</div>${regionLines}` : ''}
-          <div class="planet-notes-label">Notes</div>
-          <textarea class="planet-notes-input" data-scope="planet_notes" data-key="${escHtml(p.name)}">${escHtml(savedNote)}</textarea>
           <div class="ref-lore-toggle" onclick="togglePlanetLore(${p.index}, this)">
             <span class="ref-lore-caret">▸</span> 📖 Wiki Lore <span class="ref-lore-hint">(reference)</span>
           </div>
