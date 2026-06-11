@@ -25,7 +25,8 @@ _SESSION_DEFAULTS = {
     "selected_dispatches": [],
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
     "planet_visibility": {},  # {str(planet_index): bool} — True by default (per-planet show/hide)
-    "pinned_planets": [],     # [int index] searched planets pinned into their theater (editor+output)
+    "pinned_planets": [],     # [int index] planets the user added to the board (search/keep)
+    "removed_planets": [],    # [int index] planets the user took off the board (incl. auto-pulled)
     "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
@@ -209,35 +210,39 @@ def index():
     )
 
 
-def _with_pins(parsed):
-    """Return parsed with the session's pinned planets appended to its planet set (deduped),
-    so pins show in the editor AND output (subject to per-planet show/hide). Non-mutating —
-    last_parsed stays the pure parse, so unpinning just re-derives without them. Pinned planets
-    carry no live liberation rate (that needs the two-snapshot flow); they are reference pulls."""
-    pins = state["session"].get("pinned_planets") or []
-    if not parsed or not pins:
+def _apply_board(parsed):
+    """Apply the user's board edits to the parsed planet set, non-mutatingly. The board is a
+    surface: the auto-pull (top-5/front/gambit) SEEDS it, then the user adjusts —
+    board = (auto ∪ pinned) − removed. Pinned planets (added via search) are built on demand;
+    removed planets (taken off the board) are dropped. Both persist across refreshes (session
+    state), so the editor AND output reflect the board the user arranged. Pinned planets carry
+    no live liberation rate (that needs the two-snapshot flow); they are reference pulls."""
+    if not parsed:
         return parsed
-    have = {p["index"] for p in parsed["planets"]}
+    removed = set(state["session"].get("removed_planets") or [])
+    pins = state["session"].get("pinned_planets") or []
+    base = [p for p in parsed["planets"] if p["index"] not in removed]
+    have = {p["index"] for p in base}
     extra = []
     for idx in pins:
-        if idx in have:
+        if idx in have or idx in removed:
             continue
         bp = build_planet_by_index(idx)
         if bp:
             bp["pinned"] = True
             extra.append(bp)
-    if not extra:
+    if not removed and not extra:
         return parsed
     out = dict(parsed)
-    out["planets"] = parsed["planets"] + extra
+    out["planets"] = base + extra
     return out
 
 
-def _pinned_response():
-    """Rebuild the editor theaters + output from last_parsed with current pins applied —
-    the payload returned by /pin_planet and /unpin_planet so the UI updates in place."""
+def _board_response():
+    """Rebuild the editor theaters + output from last_parsed with the board applied —
+    the payload returned by /pin_planet and /remove_planet so the UI updates in place."""
     merged = _merged_flavor()
-    pp = _with_pins(state["last_parsed"])
+    pp = _apply_board(state["last_parsed"])
     theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}),
                                 planet_visibility=merged.get("planet_visibility", {}))
     return {
@@ -289,7 +294,7 @@ def refresh():
     }
 
     merged = _merged_flavor()
-    theaters = get_theater_data(_with_pins(parsed), state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
+    theaters = get_theater_data(_apply_board(parsed), state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
     modifier_panel = get_modifier_panel_data(parsed, merged)
 
     return jsonify({
@@ -348,7 +353,7 @@ def fetch2():
 
     state["last_parsed"] = parsed
     merged = _merged_flavor()
-    pp = _with_pins(parsed)
+    pp = _apply_board(parsed)
     theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
     modifier_panel = get_modifier_panel_data(parsed, merged)
     discord_text = format_discord(pp, state["classifications"], merged)
@@ -373,7 +378,7 @@ def reformat():
     if state["last_parsed"] is None:
         return jsonify({"status": "error", "message": "No data — run Refresh first"}), 400
     merged = _merged_flavor()
-    pp = _with_pins(state["last_parsed"])
+    pp = _apply_board(state["last_parsed"])
     discord_text = format_discord(pp, state["classifications"], merged)
     video_text = format_video(pp, state["classifications"], merged)
     state["last_outputs"] = {"discord": discord_text, "video": video_text}
@@ -395,7 +400,7 @@ def quick_update():
     if not isinstance(sections, list):
         return jsonify({"status": "error", "message": "Missing sections list"}), 400
     merged = _merged_flavor()
-    pp = _with_pins(state["last_parsed"])
+    pp = _apply_board(state["last_parsed"])
     discord_text = format_discord(pp, state["classifications"], merged, sections=sections)
     video_text = format_video(pp, state["classifications"], merged, sections=sections)
     return jsonify({"status": "ok", "discord": discord_text, "video": video_text})
@@ -496,34 +501,40 @@ def planet_lore():
 
 @app.route("/pin_planet", methods=["POST"])
 def pin_planet():
-    """Pin ANY galaxy planet into its theater (editor + output, subject to show/hide).
-    Returns the rebuilt theaters + output so the UI updates in place."""
+    """Add ANY galaxy planet to the board (editor + output, subject to show/hide). Also
+    un-removes it if it had been taken off. Returns the rebuilt board so the UI updates."""
     index = request.get_json().get("index")
     if index is None:
         return jsonify({"status": "error", "message": "Missing index"}), 400
     index = int(index)
     if build_planet_by_index(index) is None:
         return jsonify({"status": "error", "message": "Unknown planet index"}), 400
+    if index in state["session"]["removed_planets"]:
+        state["session"]["removed_planets"].remove(index)
     pins = state["session"]["pinned_planets"]
     if index not in pins:
         pins.append(index)
     if state["last_parsed"] is None:
         return jsonify({"status": "ok"})  # nothing to rebuild yet; next refresh will include it
-    return jsonify(_pinned_response())
+    return jsonify(_board_response())
 
 
-@app.route("/unpin_planet", methods=["POST"])
-def unpin_planet():
+@app.route("/remove_planet", methods=["POST"])
+def remove_planet():
+    """Take a planet off the board (auto-pulled OR pinned). Persists across refreshes, so a
+    removed auto planet won't be re-seeded. Stronger than Show/Hide (which keeps the card)."""
     index = request.get_json().get("index")
     if index is None:
         return jsonify({"status": "error", "message": "Missing index"}), 400
     index = int(index)
-    pins = state["session"]["pinned_planets"]
-    if index in pins:
-        pins.remove(index)
+    if index in state["session"]["pinned_planets"]:
+        state["session"]["pinned_planets"].remove(index)
+    removed = state["session"]["removed_planets"]
+    if index not in removed:
+        removed.append(index)
     if state["last_parsed"] is None:
         return jsonify({"status": "ok"})
-    return jsonify(_pinned_response())
+    return jsonify(_board_response())
 
 
 @app.route("/save_manual_orders", methods=["POST"])

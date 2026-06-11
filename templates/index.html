@@ -234,11 +234,11 @@
       color: #888; white-space: nowrap; cursor: pointer; flex-shrink: 0;
     }
     .pinned-tag { font-size: 9px; color: #8a8ab0; font-weight: normal; letter-spacing: 0; }
-    .unpin-btn {
-      font-size: 10px; background: #1a1a2a; color: #99a; border: 1px solid #3a3a5a;
-      border-radius: 3px; padding: 1px 7px; cursor: pointer; white-space: nowrap;
+    .remove-btn {
+      font-size: 11px; line-height: 1; background: #251416; color: #c98; border: 1px solid #4a2a2a;
+      border-radius: 3px; padding: 2px 6px; cursor: pointer; white-space: nowrap;
     }
-    .unpin-btn:hover { background: #26263a; border-color: #5a5a7a; }
+    .remove-btn:hover { background: #3a1c1f; border-color: #6a3a3a; color: #e0a; }
     .ref-planet.pin-flash { animation: pinFlash 1.5s ease-out; }
     @keyframes pinFlash {
       0% { box-shadow: 0 0 0 2px #8a8ab0, 0 0 12px #5a5a8a; }
@@ -1565,23 +1565,23 @@
     }
   }
 
-  async function unpinPlanet(index) {
-    setStatus('Unpinning…');
+  async function removePlanet(index) {
+    setStatus('Removing…');
     try {
-      const res = await fetch('/unpin_planet', {
+      const res = await fetch('/remove_planet', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ index }),
       });
       const data = await res.json();
-      if (data.status !== 'ok') { setStatus(data.message || 'Could not unpin.'); return; }
+      if (data.status !== 'ok') { setStatus(data.message || 'Could not remove.'); return; }
       applyPinResponse(data);
-      setStatus('Unpinned.');
+      setStatus('Taken off the board. (Re-add any planet via the Look up box.)');
     } catch (e) {
-      setStatus('Unpin failed — see server log.');
+      setStatus('Remove failed — see server log.');
     }
   }
 
-  // Re-render the editor + output boxes from a /pin or /unpin response.
+  // Re-render the editor + output boxes from a /pin_planet or /remove_planet response.
   function applyPinResponse(data) {
     if (data.theaters) buildFlavorEditor(data.theaters, data.flavor);
     if (typeof data.discord === 'string') {
@@ -2582,7 +2582,7 @@
           <div class="ref-planet-head">
             <div class="ref-planet-name">${escHtml(p.name)}${p.is_mo ? ' <span class="mo-star">★</span>' : ''}${pinnedPlanets.includes(p.index) ? ' <span class="pinned-tag">📌 pinned</span>' : ''}</div>
             <span style="display:flex;align-items:center;gap:8px">
-              ${pinnedPlanets.includes(p.index) ? `<button class="unpin-btn" onclick="unpinPlanet(${p.index})">Unpin</button>` : ''}
+              <button class="remove-btn" onclick="removePlanet(${p.index})" title="Take this planet off the board">✕</button>
               <label class="planet-show-toggle"><input type="checkbox" class="planet-visible-cb" ${p.visible === false ? '' : 'checked'} onchange="savePlanetVisibility(${p.index}, this.checked)"> Show</label>
             </span>
           </div>
