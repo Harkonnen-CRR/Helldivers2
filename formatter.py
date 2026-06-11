@@ -725,14 +725,31 @@ def _special_event_active(event, parsed_data):
     return True
 
 
+def _event_entries(event):
+    """Normalizes a special event's modifier list into [{text, tier}] entries, coercing
+    legacy plain-string lines to tier 'none' and dropping empties."""
+    out = []
+    for ln in (event.get("lines") or []):
+        if isinstance(ln, str):
+            text, tier = ln.strip(), "none"
+        elif isinstance(ln, dict):
+            text = (ln.get("text") or "").strip()
+            tier = ln.get("tier") if ln.get("tier") in _TIER_DISCORD else "none"
+        else:
+            continue
+        if text:
+            out.append({"text": text, "tier": tier})
+    return out
+
+
 def _active_special_events(flavor_texts, parsed_data, scope):
     """Active special events for a given scope ('all' or 'planets'), in order, skipping
-    empty bundles (no name and no non-blank lines)."""
+    empty bundles (no name and no entries)."""
     out = []
     for e in (flavor_texts.get("special_events") or []):
         if e.get("scope", "all") != scope:
             continue
-        has_content = e.get("name", "").strip() or any((l or "").strip() for l in (e.get("lines") or []))
+        has_content = (e.get("name") or "").strip() or bool(_event_entries(e))
         if has_content and _special_event_active(e, parsed_data):
             out.append(e)
     return out
@@ -747,9 +764,9 @@ def _section_fleetwide_discord(parsed_data, flavor_texts):
     for e in events:
         if e.get("name", "").strip():
             lines.append(f"> **{e['name'].strip()}**")
-        for ln in (e.get("lines") or []):
-            if ln.strip():
-                lines.append(f">   • {ln.strip()}")
+        for entry in _event_entries(e):
+            pre, suf = _TIER_DISCORD.get(entry["tier"], ("", ""))
+            lines.append(f">   • {pre}{entry['text']}{suf}")
     for s in free_stratagems:
         planets = s.get("planets") or []
         planet_str = ", ".join(planets) if planets else "All active fronts"
@@ -780,6 +797,7 @@ def _section_intel_discord(parsed_data, flavor_texts):
 
 def _section_planets_discord(parsed_data, classifications, flavor_texts):
     special_planet_events = _active_special_events(flavor_texts, parsed_data, "planets")
+    special_fleetwide_events = _active_special_events(flavor_texts, parsed_data, "all")
     theater_flavors = flavor_texts.get("theaters", {})
     planet_flavors = flavor_texts.get("planets", {})
     dss = parsed_data.get("dss")
@@ -892,9 +910,12 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
                 if planet["name"] in (e.get("planets") or []):
                     if e.get("name", "").strip():
                         lines.append(f"> **{e['name'].strip()}**")
-                    for ln in (e.get("lines") or []):
-                        if ln.strip():
-                            lines.append(f">   • {ln.strip()}")
+                    for entry in _event_entries(e):
+                        pre, suf = _TIER_DISCORD.get(entry["tier"], ("", ""))
+                        lines.append(f">   • {pre}{entry['text']}{suf}")
+            for e in special_fleetwide_events:
+                if e.get("name", "").strip():
+                    lines.append(f"> **{e['name'].strip()}** *(fleetwide)*")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
@@ -990,9 +1011,9 @@ def _section_fleetwide_video(parsed_data, flavor_texts):
     for e in events:
         if e.get("name", "").strip():
             lines.append(f"  {e['name'].strip().upper()}")
-        for ln in (e.get("lines") or []):
-            if ln.strip():
-                lines.append(f"    {ln.strip()}")
+        for entry in _event_entries(e):
+            transform = _TIER_VIDEO_TRANSFORM.get(entry["tier"], str.title)
+            lines.append(f"    {transform(entry['text'])}")
     for s in free_stratagems:
         planets = s.get("planets") or []
         planet_str = ", ".join(planets) if planets else "All active fronts"
@@ -1022,6 +1043,7 @@ def _section_intel_video(parsed_data, flavor_texts):
 
 def _section_planets_video(parsed_data, classifications, flavor_texts):
     special_planet_events = _active_special_events(flavor_texts, parsed_data, "planets")
+    special_fleetwide_events = _active_special_events(flavor_texts, parsed_data, "all")
     theater_flavors = flavor_texts.get("theaters", {})
     planet_flavors = flavor_texts.get("planets", {})
     dss = parsed_data.get("dss")
@@ -1117,9 +1139,12 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
                 if planet["name"] in (e.get("planets") or []):
                     if e.get("name", "").strip():
                         lines.append(f"    {e['name'].strip().upper()}")
-                    for ln in (e.get("lines") or []):
-                        if ln.strip():
-                            lines.append(f"      {ln.strip()}")
+                    for entry in _event_entries(e):
+                        transform = _TIER_VIDEO_TRANSFORM.get(entry["tier"], str.title)
+                        lines.append(f"      {transform(entry['text'])}")
+            for e in special_fleetwide_events:
+                if e.get("name", "").strip():
+                    lines.append(f"    {e['name'].strip().upper()} (FLEETWIDE)")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:

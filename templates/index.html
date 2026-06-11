@@ -334,6 +334,29 @@
     }
     textarea.planet-flavor-text:focus { outline: none; border-color: #444; }
     textarea.planet-flavor-text.visible { display: block; }
+    /* Read-only "active here" special-event reference under each planet's flavor */
+    .planet-flavor-events { margin-top: 5px; }
+    .planet-flavor-events-label { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+    .pfe-event { font-size: 11px; color: #6fae6f; margin-bottom: 3px; }
+    .pfe-name { font-weight: bold; color: #7ccf7c; }
+    .pfe-fleetwide { color: #666; font-style: italic; font-weight: normal; }
+    .pfe-lines { margin: 1px 0 0 14px; padding: 0; color: #999; }
+    .pfe-lines li { font-size: 10px; }
+    .theater-flavor-events { margin-top: 6px; }
+    .custom-planet-check.off-update { opacity: 0.85; }
+    .off-update-tag { color: #a05050; font-style: italic; font-size: 10px; }
+    /* Special Events Log */
+    .special-events-log-wrap { margin-top: 12px; border-top: 1px solid #1e1e1e; padding-top: 4px; }
+    button.special-event-archive {
+      background: #11210f; color: #6fae6f; border: 1px solid #2a4a2a; border-radius: 3px;
+      font-family: 'Courier New', monospace; font-size: 11px; padding: 2px 7px; cursor: pointer; flex-shrink: 0;
+    }
+    button.special-event-archive:hover { background: #1a3015; }
+    .log-entry { border: 1px solid #222; border-radius: 3px; padding: 5px 7px; margin-bottom: 5px; background: #121212; }
+    .log-entry-head { display: flex; align-items: center; gap: 8px; }
+    .log-entry-name { color: #7ccf7c; font-weight: bold; font-size: 12px; }
+    .log-entry-meta { color: #666; font-size: 10px; flex: 1; }
+    .log-entry-lines { margin: 3px 0 0 14px; padding: 0; color: #999; font-size: 10px; }
 
     .flavor-clear-bar {
       display: flex; gap: 4px; margin-top: 3px; justify-content: flex-end;
@@ -504,6 +527,36 @@
       cursor: pointer; line-height: 1; flex-shrink: 0;
     }
     button.custom-mod-del:hover { background: #3a1515; }
+
+    /* Special Events cards */
+    .special-event-card {
+      border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 9px;
+      margin-bottom: 8px; background: #131313;
+    }
+    .special-event-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    .special-event-row:last-child { margin-bottom: 0; }
+    input.special-event-name {
+      flex: 1; min-width: 160px;
+      background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #7ccf7c; font-family: 'Courier New', monospace; font-weight: bold;
+      font-size: 12px; padding: 4px 7px;
+    }
+    .special-event-entries { width: 100%; }
+    .special-event-entry { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    input.special-event-entry-text {
+      flex: 1; min-width: 160px;
+      background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace; font-size: 12px; padding: 4px 7px;
+    }
+    input.special-event-name:focus, input.special-event-entry-text:focus,
+    select.special-event-select:focus, input.special-event-expiry:focus { outline: none; border-color: #444; }
+    input.special-event-name::placeholder, input.special-event-entry-text::placeholder { color: #3a3a3a; }
+    .special-event-field-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+    select.special-event-select, input.special-event-expiry {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+      color: #c8c8c8; font-family: 'Courier New', monospace; font-size: 11px; padding: 3px 5px; cursor: pointer;
+    }
+    .special-event-planets { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
     button.mod-add-btn {
       background: #0f1f0f; color: #60a060; border: 1px solid #2a4a2a;
       border-radius: 3px; font-family: 'Courier New', monospace;
@@ -675,6 +728,23 @@
     </div>
   </div>
 
+  <!-- Special Events Panel -->
+  <div class="section" id="special-events-section">
+    <div class="modifiers-header" onclick="toggleSection('special-events-body', 'special-events-icon')">
+      <h3 style="margin:0">Special Events</h3>
+      <span class="toggle-icon" id="special-events-icon">▲</span>
+    </div>
+    <div id="special-events-body">
+      <div style="font-size:12px;color:#888;margin-bottom:8px">
+        Fleetwide or per-planet modifier bundles (e.g. a Strategic Threat's debuffs). Link one to an order and it shows until that order clears, or set an expiry. Applies to the output and appears as a reference under each affected planet's flavor text.
+      </div>
+      <div id="special-events-list">
+        <div class="no-hazards" id="special-events-empty">No special events — click + Add Event.</div>
+      </div>
+      <button class="mod-add-btn" onclick="addSpecialEvent()" style="margin-top:6px">+ Add Event</button>
+    </div>
+  </div>
+
   <!-- Planet Effects (auto-detected) -->
   <div class="section" id="effects-section">
     <div class="modifiers-header" onclick="toggleSection('effects-body', 'effects-icon')">
@@ -765,6 +835,18 @@
       <span style="font-size:10px;color:#555">(0 = no limit · all 3 fronts always included)</span>
     </div>
     <div id="theater-cards"></div>
+    <!-- Special Events Log (archive of cleared events) -->
+    <div class="special-events-log-wrap">
+      <div class="modifiers-header" onclick="toggleSection('special-events-log-body', 'special-events-log-icon')">
+        <h3 style="margin:0;font-size:14px">Special Events Log</h3>
+        <span class="toggle-icon" id="special-events-log-icon">▼</span>
+      </div>
+      <div id="special-events-log-body" style="display:none">
+        <div id="special-events-log-list">
+          <div class="no-hazards">No archived events yet.</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Outputs -->
@@ -909,6 +991,8 @@
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
     buildOrdersPanel(data.orders || [], data.flavor);
+    buildSpecialEventsPanel(data.orders || [], data.flavor);
+    buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
     buildFlavorEditor(data.theaters, data.flavor);
     startCountdown();
   }
@@ -971,6 +1055,8 @@
     buildDispatchPanel(data.dispatches || [], data.flavor);
     buildFreeStratagemsPanel(data.flavor);
     buildOrdersPanel(data.orders || [], data.flavor);
+    buildSpecialEventsPanel(data.orders || [], data.flavor);
+    buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
     buildFlavorEditor(data.theaters, data.flavor);
   }
 
@@ -1639,6 +1725,314 @@
     scheduleReformat();
   }
 
+  // ── Special Events ────────────────────────────────────────────
+
+  function buildSpecialEventsPanel(orders, flavor) {
+    const list = document.getElementById('special-events-list');
+    list.innerHTML = '';
+    const events = (flavor && flavor.special_events) || [];
+    if (events.length === 0) {
+      list.innerHTML = '<div class="no-hazards" id="special-events-empty">No special events — click + Add Event.</div>';
+      return;
+    }
+    for (const e of events) list.appendChild(buildSpecialEventCard(e));
+  }
+
+  function _orderLinkOptions(selectedId) {
+    let html = '<option value="">Not linked</option>';
+    for (const o of _ordersData) {
+      const id = String(o.id);
+      const label = o.title || ('Order ' + id);
+      html += `<option value="${escHtml(id)}" ${id === String(selectedId || '') ? 'selected' : ''}>${escHtml(label)}</option>`;
+    }
+    return html;
+  }
+
+  // Parse a "time left" string ("2d 5h 30m", "48h", "90m", or a bare number = hours)
+  // into milliseconds, or null if nothing parseable.
+  function _parseDuration(str) {
+    if (!str || !str.trim()) return null;
+    let ms = 0, found = false;
+    const re = /(\d+(?:\.\d+)?)\s*([dhm])/gi;
+    let m;
+    while ((m = re.exec(str)) !== null) {
+      const n = parseFloat(m[1]);
+      const u = m[2].toLowerCase();
+      ms += n * (u === 'd' ? 86400000 : u === 'h' ? 3600000 : 60000);
+      found = true;
+    }
+    if (!found) {
+      const n = parseFloat(str);
+      if (!isNaN(n)) { ms = n * 3600000; found = true; }  // bare number = hours
+    }
+    return found ? ms : null;
+  }
+
+  // Format an absolute ISO expiry as the remaining "time left" ("2d 5h 30m"), '' if none/past.
+  function _formatRemaining(iso) {
+    if (!iso) return '';
+    const ms = new Date(iso) - new Date();
+    if (isNaN(ms) || ms <= 0) return '';
+    const totalMin = Math.floor(ms / 60000);
+    const d = Math.floor(totalMin / 1440);
+    const h = Math.floor((totalMin % 1440) / 60);
+    const mn = totalMin % 60;
+    return [d ? d + 'd' : '', h ? h + 'h' : '', mn ? mn + 'm' : ''].filter(Boolean).join(' ') || '0m';
+  }
+
+  function buildSpecialEventCard(e) {
+    e = e || {};
+    const scope = e.scope === 'planets' ? 'planets' : 'all';
+    const card = document.createElement('div');
+    card.className = 'special-event-card';
+
+    // Union of currently-active planets and any the event already targets, so a planet
+    // that fell off the update (low players) can still be unticked to clear its tag.
+    const evPlanets = e.planets || [];
+    const planetUnion = [..._activePlanetNames, ...evPlanets.filter(p => !_activePlanetNames.includes(p))];
+    let planetChecksHTML = '';
+    for (const pName of planetUnion) {
+      const offUpdate = !_activePlanetNames.includes(pName);
+      const isChecked = evPlanets.includes(pName);
+      planetChecksHTML += `<label class="custom-planet-check${offUpdate ? ' off-update' : ''}"><input type="checkbox" data-planet="${escHtml(pName)}" ${isChecked ? 'checked' : ''}> ${escHtml(pName)}${offUpdate ? ' <span class="off-update-tag">(off update)</span>' : ''}</label>`;
+    }
+
+    card.innerHTML = `
+      <div class="special-event-row">
+        <input type="text" class="special-event-name" placeholder="EVENT NAME (e.g. MORTAL SCARCITY)" value="${escHtml(e.name || '')}">
+        <label class="custom-planet-check"><input type="checkbox" class="special-event-enabled" ${e.enabled === false ? '' : 'checked'}> On</label>
+        <button type="button" class="special-event-archive" title="Archive to the Special Events Log">Archive ⤓</button>
+        <button class="custom-mod-del special-event-del" title="Delete (no record)">×</button>
+      </div>
+      <div class="special-event-entries"></div>
+      <button type="button" class="mod-add-btn special-event-add-entry" style="margin:0 0 6px">+ Add Entry</button>
+      <div class="special-event-row">
+        <span class="special-event-field-label">Scope</span>
+        <select class="special-event-select special-event-scope">
+          <option value="all" ${scope === 'all' ? 'selected' : ''}>All planets (fleetwide)</option>
+          <option value="planets" ${scope === 'planets' ? 'selected' : ''}>Specific planets</option>
+        </select>
+        <div class="special-event-planets" style="${scope === 'planets' ? '' : 'display:none'}">${planetChecksHTML}</div>
+      </div>
+      <div class="special-event-row">
+        <span class="special-event-field-label">Link to order</span>
+        <select class="special-event-select special-event-link">${_orderLinkOptions(e.linked_order_id)}</select>
+        <span class="special-event-field-label">Time left</span>
+        <input type="text" class="special-event-expiry" placeholder="e.g. 2d 5h or 90m" value="${_formatRemaining(e.expires)}">
+      </div>
+    `;
+
+    const save = () => saveAllSpecialEvents();
+    card.dataset.expires = e.expires || '';
+
+    // Populate modifier entry rows (coercing legacy plain-string lines)
+    const entriesDiv = card.querySelector('.special-event-entries');
+    const entries = (e.lines || []).map(l => (typeof l === 'string')
+      ? { text: l, tier: 'none' } : { text: (l.text || ''), tier: (l.tier || 'none') });
+    if (entries.length === 0) entries.push({ text: '', tier: 'none' });
+    for (const en of entries) entriesDiv.appendChild(buildSpecialEventEntryRow(en.text, en.tier));
+    card.querySelector('.special-event-add-entry').addEventListener('click', () => {
+      const row = buildSpecialEventEntryRow('', 'none');
+      entriesDiv.appendChild(row);
+      row.querySelector('.special-event-entry-text').focus();
+    });
+
+    card.querySelector('.special-event-name').addEventListener('input', save);
+    card.querySelector('.special-event-enabled').addEventListener('change', save);
+    card.querySelector('.special-event-link').addEventListener('change', save);
+    const expiryInput = card.querySelector('.special-event-expiry');
+    expiryInput.addEventListener('change', () => {
+      const ms = _parseDuration(expiryInput.value);
+      card.dataset.expires = (ms != null) ? new Date(Date.now() + ms).toISOString() : '';
+      save();
+    });
+    const scopeSel = card.querySelector('.special-event-scope');
+    scopeSel.addEventListener('change', () => {
+      card.querySelector('.special-event-planets').style.display = scopeSel.value === 'planets' ? '' : 'none';
+      save();
+    });
+    card.querySelectorAll('.special-event-planets input').forEach(cb => cb.addEventListener('change', save));
+    card.querySelector('.special-event-archive').addEventListener('click', () => archiveSpecialEvent(card));
+    card.querySelector('.special-event-del').addEventListener('click', () => { card.remove(); _ensureSpecialEventsEmpty(); saveAllSpecialEvents(); });
+
+    return card;
+  }
+
+  function buildSpecialEventEntryRow(text, tier) {
+    const row = document.createElement('div');
+    row.className = 'special-event-entry';
+    row.innerHTML = `
+      <input type="text" class="special-event-entry-text" placeholder="Modifier — e.g. Budget Reduction — reinforcements -1" value="${escHtml(text || '')}">
+      <select class="special-event-select special-event-entry-tier">
+        <option value="large" ${tier === 'large' ? 'selected' : ''}>Large</option>
+        <option value="small" ${tier === 'small' ? 'selected' : ''}>Small</option>
+        <option value="none"  ${tier === 'none'  ? 'selected' : ''}>Minimal</option>
+      </select>
+      <button type="button" class="custom-mod-del special-event-entry-del" title="Remove">×</button>
+    `;
+    const save = () => saveAllSpecialEvents();
+    row.querySelector('.special-event-entry-text').addEventListener('input', save);
+    row.querySelector('.special-event-entry-tier').addEventListener('change', save);
+    row.querySelector('.special-event-entry-del').addEventListener('click', () => { row.remove(); saveAllSpecialEvents(); });
+    return row;
+  }
+
+  function addSpecialEvent() {
+    const list = document.getElementById('special-events-list');
+    const empty = document.getElementById('special-events-empty');
+    if (empty) empty.remove();
+    const card = buildSpecialEventCard({ enabled: true, scope: 'all' });
+    list.appendChild(card);
+    card.querySelector('.special-event-name').focus();
+  }
+
+  function _collectEventFromCard(card) {
+    const name = card.querySelector('.special-event-name').value.trim();
+    const lines = [...card.querySelectorAll('.special-event-entry')].map(r => ({
+      text: r.querySelector('.special-event-entry-text').value.trim(),
+      tier: r.querySelector('.special-event-entry-tier').value,
+    })).filter(en => en.text);
+    const scope = card.querySelector('.special-event-scope').value === 'planets' ? 'planets' : 'all';
+    const planets = scope === 'planets'
+      ? [...card.querySelectorAll('.special-event-planets input')].filter(cb => cb.checked).map(cb => cb.dataset.planet)
+      : [];
+    const linked = card.querySelector('.special-event-link').value || null;
+    const expires = card.dataset.expires || null;
+    const enabled = card.querySelector('.special-event-enabled').checked;
+    return { name, lines, scope, planets, enabled, expires, linked_order_id: linked };
+  }
+
+  function _collectSpecialEvents() {
+    return [...document.querySelectorAll('#special-events-list .special-event-card')].map(_collectEventFromCard);
+  }
+
+  function _ensureSpecialEventsEmpty() {
+    const list = document.getElementById('special-events-list');
+    if (list && !list.querySelector('.special-event-card')) {
+      list.innerHTML = '<div class="no-hazards" id="special-events-empty">No special events — click + Add Event.</div>';
+    }
+  }
+
+  // Archive a done event to the Special Events Log, then drop it from the active list.
+  function archiveSpecialEvent(card) {
+    const event = _collectEventFromCard(card);
+    if (!event.name && event.lines.length === 0) { card.remove(); _ensureSpecialEventsEmpty(); saveAllSpecialEvents(); return; }
+    card.remove();
+    _ensureSpecialEventsEmpty();
+    saveAllSpecialEvents();  // persist the trimmed active list
+    fetch('/log_special_event', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event }),
+    }).then(r => r.json()).then(d => buildSpecialEventsLog(d.log || []));
+  }
+
+  function buildSpecialEventsLog(log) {
+    const list = document.getElementById('special-events-log-list');
+    if (!list) return;
+    log = log || [];
+    if (log.length === 0) {
+      list.innerHTML = '<div class="no-hazards">No archived events yet.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    log.forEach((e, i) => {
+      const entries = (e.lines || []).map(l => (typeof l === 'string') ? l : (l.text || '')).filter(Boolean);
+      const when = e.archived_at ? new Date(e.archived_at).toLocaleString() : '';
+      const scopeStr = e.scope === 'planets' ? ((e.planets || []).join(', ') || 'specific planets') : 'fleetwide';
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+      row.innerHTML = `
+        <div class="log-entry-head">
+          <span class="log-entry-name">${escHtml(e.name || '(unnamed)')}</span>
+          <span class="log-entry-meta">${escHtml(scopeStr)}${when ? ' · archived ' + escHtml(when) : ''}</span>
+          <button type="button" class="custom-mod-del log-entry-del" title="Delete from log">×</button>
+        </div>
+        ${entries.length ? '<ul class="log-entry-lines">' + entries.map(t => `<li>${escHtml(t)}</li>`).join('') + '</ul>' : ''}
+      `;
+      row.querySelector('.log-entry-del').addEventListener('click', () => {
+        fetch('/delete_log_entry', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: i }),
+        }).then(r => r.json()).then(d => buildSpecialEventsLog(d.log || []));
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function saveAllSpecialEvents() {
+    const events = _collectSpecialEvents();
+    fetch('/save_special_events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events }),
+    });
+    if (typeof refreshPlanetEventRefs === 'function') refreshPlanetEventRefs(events);
+    scheduleReformat();
+  }
+
+  // Mirror of formatter._special_event_active so the flavor-area reference shows exactly
+  // what the output will render (enabled, not expired, and any linked order still present).
+  function _specialEventActiveJS(e) {
+    if (e.enabled === false) return false;
+    if (e.expires) {
+      const d = new Date(e.expires);
+      if (!isNaN(d) && d <= new Date()) return false;
+    }
+    if (e.linked_order_id) {
+      const present = _ordersData.some(o => String(o.id) === String(e.linked_order_id));
+      if (!present) return false;
+    }
+    return true;
+  }
+
+  // Fills the read-only "active here" reference under each planet's flavor textarea.
+  // Renders the inner reference items. Fleetwide events show name-only (full detail lives
+  // in FLEETWIDE STATUS); planet-scoped events list their entries, and at theater level
+  // also note which of the context planets they're on.
+  function _renderEventRefItems(active, contextPlanets, showOnPlanet) {
+    let html = '';
+    for (const e of active) {
+      const isFleet = e.scope !== 'planets';
+      let tag = '';
+      if (isFleet) tag = ' <span class="pfe-fleetwide">(fleetwide)</span>';
+      else if (showOnPlanet) {
+        const here = (e.planets || []).filter(p => contextPlanets.includes(p));
+        if (here.length) tag = ` <span class="pfe-fleetwide">(on ${escHtml(here.join(', '))})</span>`;
+      }
+      const nameHtml = e.name ? `<span class="pfe-name">${escHtml(e.name)}</span>${tag}`
+                              : `<span class="pfe-fleetwide">${(tag || '(special event)').trim()}</span>`;
+      html += `<div class="pfe-event">${nameHtml}`;
+      if (!isFleet) {
+        const entries = (e.lines || []).map(l => (typeof l === 'string') ? l : (l.text || '')).filter(Boolean);
+        if (entries.length) html += '<ul class="pfe-lines">' + entries.map(t => `<li>${escHtml(t)}</li>`).join('') + '</ul>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function refreshPlanetEventRefs(events) {
+    events = events || [];
+    document.querySelectorAll('.planet-flavor-events').forEach(div => {
+      const planet = div.dataset.planet;
+      const active = events.filter(e => _specialEventActiveJS(e) &&
+        (e.scope !== 'planets' || (e.planets || []).includes(planet)));
+      if (active.length === 0) { div.innerHTML = ''; div.style.display = 'none'; return; }
+      div.style.display = 'block';
+      div.innerHTML = '<div class="planet-flavor-events-label">Active here (reference)</div>' +
+        _renderEventRefItems(active, [planet], false);
+    });
+    document.querySelectorAll('.theater-flavor-events').forEach(div => {
+      const planets = (div.dataset.planets || '').split('|').filter(Boolean);
+      const active = events.filter(e => _specialEventActiveJS(e) &&
+        (e.scope !== 'planets' || (e.planets || []).some(p => planets.includes(p))));
+      if (active.length === 0) { div.innerHTML = ''; div.style.display = 'none'; return; }
+      div.style.display = 'block';
+      div.innerHTML = '<div class="planet-flavor-events-label">Active in this theater (reference)</div>' +
+        _renderEventRefItems(active, planets, true);
+    });
+  }
+
   // ── Free Stratagems ───────────────────────────────────────────
 
   function buildFreeStratagemsPanel(flavor) {
@@ -1778,9 +2172,11 @@
       const writePanel = document.createElement('div');
       writePanel.className = 'flavor-write-panel';
       const savedTheater = theaterFlavors[faction] || '';
+      const _theaterPlanetNames = theater.planets.map(p => p.name);
       writePanel.innerHTML = `
         <label>Theater flavor text</label>
         <textarea class="flavor-textarea" data-scope="theaters" data-key="${escHtml(faction)}">${escHtml(savedTheater)}</textarea>
+        <div class="theater-flavor-events" data-planets="${escHtml(_theaterPlanetNames.join('|'))}"></div>
       `;
 
       // Right: reference panel
@@ -1806,6 +2202,7 @@
           </label>
           <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
             data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
+          <div class="planet-flavor-events" data-planet="${escHtml(planet.name)}"></div>
         `;
         planetSection.appendChild(item);
       }
@@ -1824,6 +2221,8 @@
       ta.addEventListener('input', () => saveFlavor(ta.dataset.scope, ta.dataset.key, ta.value));
       attachClearUndo(ta);
     });
+
+    refreshPlanetEventRefs((flavor && flavor.special_events) || []);
   }
 
   function attachClearUndo(ta) {

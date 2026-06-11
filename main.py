@@ -16,7 +16,7 @@ CLASSIFICATIONS_PATH = "data/classifications.json"
 FLAVOR_PATH = "data/flavor.json"
 
 # Keys stored in flavor.json and loaded across sessions
-_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels", "effect_formats", "special_events"}
+_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels", "effect_formats", "special_events", "special_events_log"}
 
 # Session-only defaults — reset on every page load, never written to disk
 _SESSION_DEFAULTS = {
@@ -114,7 +114,7 @@ def _load_flavor():
     defaults = {
         "theaters": {}, "planets": {}, "planet_notes": {},
         "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
-        "order_labels": {}, "effect_formats": {}, "special_events": [],
+        "order_labels": {}, "effect_formats": {}, "special_events": [], "special_events_log": [],
     }
     if os.path.exists(FLAVOR_PATH):
         with open(FLAVOR_PATH) as f:
@@ -514,34 +514,71 @@ def save_custom_modifiers():
     return jsonify({"status": "ok"})
 
 
+def _normalize_special_event(e):
+    """Validates/normalizes one special-event dict. Returns the cleaned dict, or None
+    if it has neither a name nor any non-empty entry. Shared by save + archive."""
+    if not isinstance(e, dict):
+        return None
+    name = (e.get("name") or "").strip()
+    entries = []
+    for ln in (e.get("lines") or []):
+        if isinstance(ln, str):
+            text, tier = ln.strip(), "none"
+        elif isinstance(ln, dict):
+            text = (ln.get("text") or "").strip()
+            tier = ln.get("tier") if ln.get("tier") in ("large", "small", "none") else "none"
+        else:
+            continue
+        if text:
+            entries.append({"text": text, "tier": tier})
+    if not (name or entries):
+        return None
+    scope = "planets" if e.get("scope") == "planets" else "all"
+    linked = e.get("linked_order_id")
+    return {
+        "name": name,
+        "lines": entries,
+        "scope": scope,
+        "planets": [p for p in (e.get("planets") or []) if isinstance(p, str)] if scope == "planets" else [],
+        "enabled": bool(e.get("enabled", True)),
+        "expires": ((e.get("expires") or "").strip() or None),
+        "linked_order_id": (str(linked) if linked else None),
+    }
+
+
 @app.route("/save_special_events", methods=["POST"])
 def save_special_events():
-    """Persists the full special_events list. Drops empty bundles (no name and no
-    non-blank lines); normalizes scope/planets/enabled/expires/linked_order_id."""
+    """Persists the full active special_events list (drops empty bundles)."""
     data = request.get_json() or {}
-    events = data.get("events", [])
-    valid = []
-    for e in events:
-        if not isinstance(e, dict):
-            continue
-        name = (e.get("name") or "").strip()
-        lines = [l.strip() for l in (e.get("lines") or []) if isinstance(l, str) and l.strip()]
-        if not (name or lines):
-            continue
-        scope = "planets" if e.get("scope") == "planets" else "all"
-        linked = e.get("linked_order_id")
-        valid.append({
-            "name": name,
-            "lines": lines,
-            "scope": scope,
-            "planets": [p for p in (e.get("planets") or []) if isinstance(p, str)] if scope == "planets" else [],
-            "enabled": bool(e.get("enabled", True)),
-            "expires": ((e.get("expires") or "").strip() or None),
-            "linked_order_id": (str(linked) if linked else None),
-        })
+    valid = [ne for e in data.get("events", []) if (ne := _normalize_special_event(e))]
     state["flavor"]["special_events"] = valid
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
+
+
+@app.route("/log_special_event", methods=["POST"])
+def log_special_event():
+    """Archives one special event to special_events_log (newest first) with a timestamp.
+    The caller separately saves the trimmed active list via /save_special_events."""
+    data = request.get_json() or {}
+    entry = _normalize_special_event(data.get("event") or {})
+    if entry:
+        entry["archived_at"] = datetime.now(timezone.utc).isoformat()
+        state["flavor"].setdefault("special_events_log", []).insert(0, entry)
+        _save_flavor(state["flavor"])
+    return jsonify({"status": "ok", "log": state["flavor"].get("special_events_log", [])})
+
+
+@app.route("/delete_log_entry", methods=["POST"])
+def delete_log_entry():
+    """Removes one archived entry from special_events_log by index."""
+    data = request.get_json() or {}
+    idx = data.get("index")
+    log = state["flavor"].setdefault("special_events_log", [])
+    if isinstance(idx, int) and 0 <= idx < len(log):
+        log.pop(idx)
+        _save_flavor(state["flavor"])
+    return jsonify({"status": "ok", "log": log})
 
 
 @app.route("/save_faction_modifier", methods=["POST"])
