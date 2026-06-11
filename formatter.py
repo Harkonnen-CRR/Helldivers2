@@ -902,7 +902,7 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
         if i > 0:
             lines.append("---")
         display = _THEATER_DISPLAY.get(faction, faction.upper())
-        lines.append(f"**{display} FRONT**")
+        lines.append(f"**{display}{'' if faction == 'Humans' else ' FRONT'}**")
         theater_text = theater_flavors.get(faction)
         if theater_text:
             lines.append(f"*{theater_text}*")
@@ -1151,7 +1151,7 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
     for faction in theater_order:
         lines.append(MAJOR_SEP)
         display = _THEATER_DISPLAY.get(faction, faction.upper())
-        lines.append(f"{display} FRONT")
+        lines.append(f"{display}{'' if faction == 'Humans' else ' FRONT'}")
         lines.append(MAJOR_SEP)
         theater_text = theater_flavors.get(faction)
         if theater_text:
