@@ -19,6 +19,15 @@ _STATUS_LABEL_MAP = {
     3: "cooldown",
 }
 
+# Default broadcast title per API order title. Keyed on the raw `title` field so the
+# default is position-independent (a Strategic Threat no longer inherits a Major/Minor
+# default just because of its slot). Unknown titles → None → positional fallback in UI.
+_ORDER_TITLE_DEFAULTS = {
+    "MAJOR ORDER":           "PRIORITY ALERT: NEW MAJOR ORDER",
+    "STRATEGIC THREAT":      "PRIORITY ALERT: NEW STRATEGIC THREAT",
+    "STRATEGIC OPPORTUNITY": "ALERT: STRATEGIC OPPORTUNITY IDENTIFIED",
+}
+
 _EFFECT_LABELS_PATH = os.path.join("fixtures", "effect_labels.json")
 _PLANET_EFFECTS_PATH = os.path.join("data", "planet_effects.json")
 
@@ -222,6 +231,7 @@ def _build_order(a):
         "expiration": a["expiration"],
         "tasks": tasks,
         "progress": a.get("progress"),
+        "suggested_title": _ORDER_TITLE_DEFAULTS.get((a.get("title") or "").upper().strip()),
     }
 
 
