@@ -378,13 +378,18 @@ def _order_visible(order, flavor):
 
 
 def _get_mo_planet_indices(parsed_data):
+    """Planet indices an MO targets — drives the ★ marker and MO-first sort.
+
+    Reads the value-type-12 (planet index) slot from EVERY MO task, not just
+    liberate/defense: win_missions / control_planet / eradicate tasks also carry their
+    target planet there. E.g. a "complete N missions" Major Order scoped to Omicron stores
+    Omicron's index in type-12 even though the task type isn't planet-named."""
     indices = set()
     for order in parsed_data.get("orders", []):
         for task in order.get("tasks", []):
-            if task["decoded_type"] in ("liberate_planet", "defense_planet"):
-                for vtype, val in zip(task["value_types"], task["values"]):
-                    if vtype == 12:  # value type 12 = planet index in HD2 API
-                        indices.add(val)
+            for vtype, val in zip(task["value_types"], task["values"]):
+                if vtype == 12:  # value type 12 = planet index in HD2 API
+                    indices.add(val)
     return indices
 
 
