@@ -14,12 +14,27 @@ we can split it into entries with no HTML parsing and no extra dependencies.
 This first pass is data-layer only: fetch + parse + return the entry list. No caching, no UI.
 Run `python wiki_lore.py [PageName]` to inspect the extracted entries for one planet.
 """
+import json
+import os
 import re
 import sys
+import time
+from datetime import datetime, timezone
+
 import requests
 
 WIKI_API = "https://helldivers.wiki.gg/api.php"
+MODULE_RAW = "https://helldivers.wiki.gg/index.php?title=Module:Data/PlanetStatistics&action=raw"
 USER_AGENT = "SEAF-Daily-Briefing/1.0 (Helldivers 2 war-update tool; contact via app)"
+
+DATA_DIR = "data"
+PAGENAME_MAP_PATH = os.path.join(DATA_DIR, "planet_pagenames.json")
+LORE_CACHE_PATH = os.path.join(DATA_DIR, "planet_lore.json")
+
+# index -> pagename, pulled from the wiki Lua module. Field order there is stable
+# (`["index"] = N, ["Name"] = "...", ["pagename"] = "..."`), so a targeted regex avoids a
+# Lua parser / slpp dependency — we only want these two fields.
+_PAGENAME_RE = re.compile(r'\["index"\] = (\d+), \["Name"\] = "[^"]*", \["pagename"\] = "([^"]*)"')
 
 # Sections we never want as lore entries (images, citations, redundant stats block).
 _SKIP_SECTIONS = {"gallery", "media", "references", "notes references", "statistics", "see also"}
@@ -128,11 +143,101 @@ def fetch_planet_lore(pagename):
     return {"pagename": pagename, "page_revid": revid, "entries": entries, "terms": terms}
 
 
+def fetch_pagename_map():
+    """index -> wiki pagename, from the Lua data module (one request)."""
+    resp = requests.get(MODULE_RAW, headers={"User-Agent": USER_AGENT}, timeout=30)
+    resp.raise_for_status()
+    return {int(idx): name for idx, name in _PAGENAME_RE.findall(resp.text)}
+
+
+def _load_pagename_map(refresh=False):
+    """Cached index -> pagename map; fetched + cached to disk on first use."""
+    if not refresh and os.path.exists(PAGENAME_MAP_PATH):
+        with open(PAGENAME_MAP_PATH) as f:
+            return {int(k): v for k, v in json.load(f).items()}
+    mapping = fetch_pagename_map()
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(PAGENAME_MAP_PATH, "w") as f:
+        json.dump(mapping, f, indent=2, ensure_ascii=False)
+    return mapping
+
+
+def _load_lore_cache():
+    if os.path.exists(LORE_CACHE_PATH):
+        with open(LORE_CACHE_PATH) as f:
+            return json.load(f)
+    return {}
+
+
+def _save_lore_cache(cache):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(LORE_CACHE_PATH, "w") as f:
+        json.dump(cache, f, indent=2, ensure_ascii=False)
+
+
+def _fetch_into(index, cache, pagenames):
+    """Fetch one planet's lore and store it in the cache dict (keyed by str index)."""
+    pagename = pagenames.get(index)
+    if not pagename:
+        return None
+    data = fetch_planet_lore(pagename)
+    if data is None:
+        return None
+    data["index"] = index
+    data["fetched"] = datetime.now(timezone.utc).isoformat()
+    cache[str(index)] = data
+    return data
+
+
+def get_planet_lore(index, refresh=False):
+    """Lazy single access point: return a planet's lore by index, fetching + caching to
+    data/planet_lore.json on first access. The editor, the search feature, the diver's-eye
+    view (2c), and the Discord bot all go through here. Returns None if no wiki page."""
+    index = int(index)
+    cache = _load_lore_cache()
+    key = str(index)
+    if not refresh and key in cache:
+        return cache[key]
+    data = _fetch_into(index, cache, _load_pagename_map())
+    if data is not None:
+        _save_lore_cache(cache)
+    return data
+
+
+def warm_all(indices=None, delay=0.2):
+    """Bulk-populate the lore cache (turns the lazy cache into a full corpus for
+    offline/server/bot use). Skips already-cached planets; one disk write at the end.
+    Returns (fetched, skipped, missing)."""
+    cache = _load_lore_cache()
+    pagenames = _load_pagename_map()
+    targets = list(indices) if indices is not None else sorted(pagenames)
+    fetched = skipped = missing = 0
+    for idx in targets:
+        if str(idx) in cache:
+            skipped += 1
+            continue
+        if _fetch_into(int(idx), cache, pagenames) is not None:
+            fetched += 1
+            if delay:
+                time.sleep(delay)  # be polite to the wiki
+        else:
+            missing += 1
+    _save_lore_cache(cache)
+    return fetched, skipped, missing
+
+
 if __name__ == "__main__":
-    name = " ".join(sys.argv[1:]) or "Crimsica"
-    data = fetch_planet_lore(name)
+    arg = " ".join(sys.argv[1:]) or "Crimsica"
+    # An integer arg exercises the lazy index path (get_planet_lore + cache); otherwise
+    # treat the arg as a wiki pagename and fetch directly (no cache).
+    if arg.isdigit():
+        data = get_planet_lore(int(arg))
+        src = f"index {arg} (lazy cache)"
+    else:
+        data = fetch_planet_lore(arg)
+        src = f"page {arg!r}"
     if not data:
-        print(f"No wiki page found for {name!r}")
+        print(f"No wiki lore found for {src}")
         sys.exit(1)
     print(f"=== {data['pagename']}  (revid {data['page_revid']}) — {len(data['entries'])} entries ===\n")
     for e in data["entries"]:
