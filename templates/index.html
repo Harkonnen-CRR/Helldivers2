@@ -234,6 +234,11 @@
       color: #888; white-space: nowrap; cursor: pointer; flex-shrink: 0;
     }
     .pinned-tag { font-size: 9px; color: #8a8ab0; font-weight: normal; letter-spacing: 0; }
+    .move-btn {
+      font-size: 9px; line-height: 1; background: #14201c; color: #8ba; border: 1px solid #2a4035;
+      border-radius: 3px; padding: 2px 4px; cursor: pointer; white-space: nowrap;
+    }
+    .move-btn:hover { background: #1c2c26; border-color: #3a5a48; color: #adc; }
     .remove-btn {
       font-size: 11px; line-height: 1; background: #251416; color: #c98; border: 1px solid #4a2a2a;
       border-radius: 3px; padding: 2px 6px; cursor: pointer; white-space: nowrap;
@@ -1603,6 +1608,25 @@
     setTimeout(() => card.classList.remove('pin-flash'), 1500);
   }
 
+  // Reorder the board — reflected in the editor AND the broadcast output.
+  async function movePlanet(index, dir) {
+    const res = await fetch('/move_planet', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index, dir }),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') applyPinResponse(data);
+  }
+
+  async function moveTheater(faction, dir) {
+    const res = await fetch('/move_theater', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faction, dir }),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') applyPinResponse(data);
+  }
+
   function addManualOrder() {
     const list = document.getElementById('orders-list');
     const empty = list.querySelector('.no-hazards');
@@ -2424,7 +2448,11 @@
       const header = document.createElement('div');
       header.className = 'theater-card-header' + (isExcluded ? ' theater-excluded' : '');
       header.innerHTML = `
-        <span style="${isExcluded ? 'opacity:0.45;text-decoration:line-through' : ''}">${theaterDisplayName}${faction === 'Humans' ? '' : ' FRONT'}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <button class="move-btn" onclick="event.stopPropagation();moveTheater('${escHtml(faction)}', -1)" title="Move this front up">▲</button>
+          <button class="move-btn" onclick="event.stopPropagation();moveTheater('${escHtml(faction)}', 1)" title="Move this front down">▼</button>
+          <span style="${isExcluded ? 'opacity:0.45;text-decoration:line-through' : ''}">${theaterDisplayName}${faction === 'Humans' ? '' : ' FRONT'}</span>
+        </span>
         <span style="display:flex;align-items:center;gap:12px">
           <label onclick="event.stopPropagation()" style="font-size:11px;color:#888;font-weight:normal;cursor:pointer">
             <input type="checkbox" ${isExcluded ? 'checked' : ''} onchange="saveTheaterExclude('${escHtml(faction)}', this.checked, this)" style="accent-color:#c05050;cursor:pointer">
@@ -2583,7 +2611,9 @@
         <div class="ref-planet${factionClass ? ' ' + factionClass : ''}${p.visible === false ? ' planet-hidden' : ''}" data-planet-index="${p.index}">
           <div class="ref-planet-head">
             <div class="ref-planet-name">${escHtml(p.name)}${p.is_mo ? ' <span class="mo-star">★</span>' : ''}${pinnedPlanets.includes(p.index) ? ' <span class="pinned-tag">📌 pinned</span>' : ''}</div>
-            <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:flex;align-items:center;gap:6px">
+              <button class="move-btn" onclick="movePlanet(${p.index}, -1)" title="Move up in this front">▲</button>
+              <button class="move-btn" onclick="movePlanet(${p.index}, 1)" title="Move down in this front">▼</button>
               <button class="remove-btn" onclick="removePlanet(${p.index})" title="Take this planet off the board">✕</button>
               <label class="planet-show-toggle"><input type="checkbox" class="planet-visible-cb" ${p.visible === false ? '' : 'checked'} onchange="savePlanetVisibility(${p.index}, this.checked)"> Show</label>
             </span>

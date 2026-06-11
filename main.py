@@ -27,6 +27,8 @@ _SESSION_DEFAULTS = {
     "planet_visibility": {},  # {str(planet_index): bool} — True by default (per-planet show/hide)
     "pinned_planets": [],     # [int index] planets the user added to the board (search/keep)
     "removed_planets": [],    # [int index] planets the user took off the board (incl. auto-pulled)
+    "theater_order": [],      # [faction] manual front order (board reorder); unset = default
+    "planet_order": [],       # [int index] manual planet order within fronts (board reorder)
     "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
@@ -262,7 +264,8 @@ def _board_response():
     merged = _merged_flavor()
     pp = _apply_board(parsed)
     theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}),
-                                planet_visibility=merged.get("planet_visibility", {}))
+                                planet_visibility=merged.get("planet_visibility", {}),
+                                theater_seq=merged.get("theater_order"), planet_seq=merged.get("planet_order"))
     return {
         "status": "ok",
         "theaters": theaters,
@@ -270,6 +273,23 @@ def _board_response():
         "video": format_video(pp, state["classifications"], merged),
         "flavor": merged,
     }
+
+
+def _current_board_order():
+    """The board as currently displayed: (ordered list of factions, {faction: [planet_index…]}),
+    with pins/removes + any existing reorder applied. Move routes read this, swap, and persist
+    the new sequence — so a one-step ↑/↓ operates on exactly what's on screen."""
+    parsed = _current_parsed()
+    if parsed is None:
+        return [], {}
+    merged = _merged_flavor()
+    td = get_theater_data(_apply_board(parsed), state["classifications"],
+                          merged.get("planet_modifiers", {}),
+                          planet_visibility=merged.get("planet_visibility", {}),
+                          theater_seq=merged.get("theater_order"), planet_seq=merged.get("planet_order"))
+    factions = [t["faction"] for t in td]
+    planets = {t["faction"]: [p["index"] for p in t["planets"]] for t in td}
+    return factions, planets
 
 
 @app.route("/refresh", methods=["POST"])
@@ -312,7 +332,7 @@ def refresh():
     }
 
     merged = _merged_flavor()
-    theaters = get_theater_data(_apply_board(parsed), state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
+    theaters = get_theater_data(_apply_board(parsed), state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}), theater_seq=merged.get("theater_order"), planet_seq=merged.get("planet_order"))
     modifier_panel = get_modifier_panel_data(parsed, merged)
 
     return jsonify({
@@ -372,7 +392,7 @@ def fetch2():
     state["last_parsed"] = parsed
     merged = _merged_flavor()
     pp = _apply_board(parsed)
-    theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
+    theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}), theater_seq=merged.get("theater_order"), planet_seq=merged.get("planet_order"))
     modifier_panel = get_modifier_panel_data(parsed, merged)
     discord_text = format_discord(pp, state["classifications"], merged)
     video_text = format_video(pp, state["classifications"], merged)
@@ -559,6 +579,47 @@ def restore_top5():
     for idx in top_populated_indices(5):
         if idx in removed:
             removed.remove(idx)
+    return jsonify(_board_response())
+
+
+@app.route("/move_planet", methods=["POST"])
+def move_planet():
+    """Move a planet card up/down within its front (dir = -1 up, +1 down). Persists the new
+    within-front order; reflects in editor AND output."""
+    data = request.get_json()
+    index = data.get("index")
+    direction = data.get("dir")
+    if index is None or direction not in (-1, 1):
+        return jsonify({"status": "error", "message": "Need index and dir of -1 or 1"}), 400
+    index = int(index)
+    factions, planets = _current_board_order()
+    for f in factions:
+        lst = planets[f]
+        if index in lst:
+            i = lst.index(index)
+            j = i + direction
+            if 0 <= j < len(lst):
+                lst[i], lst[j] = lst[j], lst[i]
+            break
+    state["session"]["planet_order"] = [idx for f in factions for idx in planets[f]]
+    return jsonify(_board_response())
+
+
+@app.route("/move_theater", methods=["POST"])
+def move_theater():
+    """Move a whole front up/down in the board order (dir = -1 up, +1 down)."""
+    data = request.get_json()
+    faction = data.get("faction")
+    direction = data.get("dir")
+    if not faction or direction not in (-1, 1):
+        return jsonify({"status": "error", "message": "Need faction and dir of -1 or 1"}), 400
+    factions, _ = _current_board_order()
+    if faction in factions:
+        i = factions.index(faction)
+        j = i + direction
+        if 0 <= j < len(factions):
+            factions[i], factions[j] = factions[j], factions[i]
+    state["session"]["theater_order"] = factions
     return jsonify(_board_response())
 
 
