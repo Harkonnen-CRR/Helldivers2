@@ -459,6 +459,23 @@ def _build_theaters(parsed_data, hidden_indices=None):
     return theater_order, theaters
 
 
+def _apply_board_order(theater_order, theaters, theater_seq, planet_seq):
+    """Apply the user's manual board arrangement on top of the default ordering: reorder the
+    fronts by theater_seq (list of factions) and the planets within each front by planet_seq
+    (list of planet indices). Items the user hasn't moved keep their default (stable) order.
+    BOTH the editor (get_theater_data) and the output (format_discord/video) call this, so the
+    broadcast reflects the on-screen arrangement."""
+    if theater_seq:
+        trank = {f: i for i, f in enumerate(theater_seq)}
+        theater_order = sorted(theater_order, key=lambda f: trank.get(f, len(trank)))
+    if planet_seq:
+        prank = {idx: i for i, idx in enumerate(planet_seq)}
+        for faction in list(theaters):
+            theaters[faction] = sorted(theaters[faction],
+                                       key=lambda p: prank.get(p["index"], len(prank)))
+    return theater_order, theaters
+
+
 def _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded):
     """Applies a global planet cap with a 3-front guarantee.
 
@@ -896,6 +913,8 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
     if global_limit > 0:
         theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
     theater_order = [f for f in theater_order if f not in excluded]
+    theater_order, theaters = _apply_board_order(
+        theater_order, theaters, flavor_texts.get("theater_order"), flavor_texts.get("planet_order"))
 
     lines = []
     for i, faction in enumerate(theater_order):
@@ -1146,6 +1165,8 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
     if global_limit > 0:
         theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
     theater_order = [f for f in theater_order if f not in excluded]
+    theater_order, theaters = _apply_board_order(
+        theater_order, theaters, flavor_texts.get("theater_order"), flavor_texts.get("planet_order"))
 
     lines = []
     for faction in theater_order:
@@ -1301,7 +1322,7 @@ def _dss_action_timing(action):
 
 
 def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
-                     planet_visibility=None):
+                     planet_visibility=None, theater_seq=None, planet_seq=None):
     """Returns structured theater data for the flavor editor reference panels.
 
     Pre-formats all durations and task labels so the JS template has no calculation to do.
@@ -1314,6 +1335,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
     planet_modifiers = planet_modifiers or {}
     planet_visibility = planet_visibility or {}
     theater_order, theaters = _build_theaters(parsed_data)
+    theater_order, theaters = _apply_board_order(theater_order, theaters, theater_seq, planet_seq)
     orders = parsed_data.get("orders", [])
     dss = parsed_data.get("dss")
     mo_indices = _get_mo_planet_indices(parsed_data)
