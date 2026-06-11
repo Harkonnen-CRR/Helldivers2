@@ -425,6 +425,8 @@ def _build_theaters(parsed_data):
     theater_order = []
     theaters = {}
     for planet in parsed_data["planets"]:
+        if planet.get("gambit_added"):
+            continue  # display attachment only — added by gambit closure, not the limit
         faction = _enemy_faction(planet)
         if faction not in theaters:
             theaters[faction] = []
@@ -509,6 +511,55 @@ def _balance_theaters(theater_order, theaters, parsed_data, global_limit, exclud
     new_order = [f for f in theater_order if f in new_theaters]
 
     return new_order, new_theaters
+
+
+def _gambit_summaries(parsed_data):
+    """One entry per gambit — {faction, defender, attacker} planet dicts — for the per-theater
+    GAMBITS block. faction = the shared enemy front of the pair."""
+    by_index = {p["index"]: p for p in parsed_data.get("planets", [])}
+    out = []
+    for g in parsed_data.get("gambits", []):
+        d = by_index.get(g["defender"])
+        a = by_index.get(g["attacker"])
+        if d and a:
+            out.append({"faction": _enemy_faction(d), "defender": d, "attacker": a})
+    return out
+
+
+def _gambit_defender_status(d):
+    label, value = _format_defense_time(d)
+    return f"{label}: {value}" if label else value
+
+
+def _gambit_attacker_status(a):
+    lib = a.get("liberation_time_hours")
+    return f"Liberation in {format_duration(lib)}" if lib is not None else "Establishing a Beachhead"
+
+
+def _gambit_block_discord(faction, summaries):
+    rows = [s for s in summaries if s["faction"] == faction]
+    if not rows:
+        return []
+    lines = ["**⚔ GAMBITS**"]
+    for s in rows:
+        d, a = s["defender"], s["attacker"]
+        lines.append(f"> **Defending:** {d['name']} — {d['player_count']:,} players — {_gambit_defender_status(d)}")
+        lines.append(f"> **Attacking:** {a['name']} — {a['player_count']:,} players — {_gambit_attacker_status(a)}")
+    lines.append("")
+    return lines
+
+
+def _gambit_block_video(faction, summaries):
+    rows = [s for s in summaries if s["faction"] == faction]
+    if not rows:
+        return []
+    lines = ["GAMBITS"]
+    for s in rows:
+        d, a = s["defender"], s["attacker"]
+        lines.append(f"  DEFENDING: {d['name'].upper()} — {d['player_count']:,} players — {_gambit_defender_status(d)}")
+        lines.append(f"  ATTACKING: {a['name'].upper()} — {a['player_count']:,} players — {_gambit_attacker_status(a)}")
+    lines.append("")
+    return lines
 
 
 def _format_hazard_discord(hazard, classifications):
@@ -705,19 +756,19 @@ def _section_orders_discord(parsed_data, flavor_texts):
     return lines
 
 
-def _special_event_active(event, parsed_data):
-    """A special event renders iff it is enabled, not past its expiry, and — if linked
-    to an order — that order is still in the current feed (so it auto-hides the moment
-    the Strategic Threat completes or disappears). Expiry and order-link are independent
-    gates: set either, both, or neither."""
-    if not event.get("enabled", True):
+def _timed_item_active(item, parsed_data):
+    """Shared active-gate for special events AND fleetwide equipment: shown iff enabled,
+    not past its expiry, and — if linked to an order — that order is still in the current
+    feed (so it auto-hides the moment the MO completes/disappears). Expiry and order-link
+    are independent gates: set either, both, or neither."""
+    if not item.get("enabled", True):
         return False
-    expires = event.get("expires")
+    expires = item.get("expires")
     if expires:
         remaining = _time_remaining_hours(expires)
         if remaining is not None and remaining <= 0:
             return False
-    linked = event.get("linked_order_id")
+    linked = item.get("linked_order_id")
     if linked:
         order_ids = {str(o.get("id")) for o in parsed_data.get("orders", [])}
         if str(linked) not in order_ids:
@@ -750,28 +801,44 @@ def _active_special_events(flavor_texts, parsed_data, scope):
         if e.get("scope", "all") != scope:
             continue
         has_content = (e.get("name") or "").strip() or bool(_event_entries(e))
-        if has_content and _special_event_active(e, parsed_data):
+        if has_content and _timed_item_active(e, parsed_data):
             out.append(e)
     return out
 
 
+def _active_equipment(flavor_texts, parsed_data, scope):
+    """Active fleetwide-equipment items for a scope ('all'|'planets'), in order."""
+    out = []
+    for s in (flavor_texts.get("free_stratagems") or []):
+        if not (s.get("name") or "").strip():
+            continue
+        if s.get("scope", "all") != scope:
+            continue
+        if _timed_item_active(s, parsed_data):
+            out.append(s)
+    return out
+
+
 def _section_fleetwide_discord(parsed_data, flavor_texts):
-    free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
     events = _active_special_events(flavor_texts, parsed_data, "all")
-    if not (free_stratagems or events):
+    equipment = _active_equipment(flavor_texts, parsed_data, "all")
+    if not (events or equipment):
         return []
-    lines = ["**FLEETWIDE STATUS**"]
-    for e in events:
-        if e.get("name", "").strip():
-            lines.append(f"> **{e['name'].strip()}**")
-        for entry in _event_entries(e):
-            pre, suf = _TIER_DISCORD.get(entry["tier"], ("", ""))
-            lines.append(f">   • {pre}{entry['text']}{suf}")
-    for s in free_stratagems:
-        planets = s.get("planets") or []
-        planet_str = ", ".join(planets) if planets else "All active fronts"
-        lines.append(f"> **{s['name'].strip()}** — {planet_str}")
-    lines.append("")
+    lines = []
+    if events:
+        lines.append("**FLEETWIDE STATUS**")
+        for e in events:
+            if e.get("name", "").strip():
+                lines.append(f"> **{e['name'].strip()}**")
+            for entry in _event_entries(e):
+                pre, suf = _TIER_DISCORD.get(entry["tier"], ("", ""))
+                lines.append(f">   • {pre}{entry['text']}{suf}")
+        lines.append("")
+    if equipment:
+        lines.append("**FLEETWIDE EQUIPMENT**")
+        for s in equipment:
+            lines.append(f"> **{s['name'].strip()}**")
+        lines.append("")
     return lines
 
 
@@ -798,6 +865,8 @@ def _section_intel_discord(parsed_data, flavor_texts):
 def _section_planets_discord(parsed_data, classifications, flavor_texts):
     special_planet_events = _active_special_events(flavor_texts, parsed_data, "planets")
     special_fleetwide_events = _active_special_events(flavor_texts, parsed_data, "all")
+    equipment_planet = _active_equipment(flavor_texts, parsed_data, "planets")
+    gambit_summaries = _gambit_summaries(parsed_data)
     theater_flavors = flavor_texts.get("theaters", {})
     planet_flavors = flavor_texts.get("planets", {})
     dss = parsed_data.get("dss")
@@ -825,6 +894,7 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
         if theater_text:
             lines.append(f"*{theater_text}*")
         lines.append("")
+        lines.extend(_gambit_block_discord(faction, gambit_summaries))
 
         for planet in theaters[faction]:
             is_def = planet["is_defense"]
@@ -916,6 +986,9 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
             for e in special_fleetwide_events:
                 if e.get("name", "").strip():
                     lines.append(f"> **{e['name'].strip()}** *(fleetwide)*")
+            for s in equipment_planet:
+                if planet["name"] in (s.get("planets") or []):
+                    lines.append(f"> **{s['name'].strip()}** *(equipment)*")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
@@ -1003,22 +1076,25 @@ def _section_orders_video(parsed_data, flavor_texts):
 
 
 def _section_fleetwide_video(parsed_data, flavor_texts):
-    free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
     events = _active_special_events(flavor_texts, parsed_data, "all")
-    if not (free_stratagems or events):
+    equipment = _active_equipment(flavor_texts, parsed_data, "all")
+    if not (events or equipment):
         return []
-    lines = [MAJOR_SEP, "FLEETWIDE STATUS", MAJOR_SEP]
-    for e in events:
-        if e.get("name", "").strip():
-            lines.append(f"  {e['name'].strip().upper()}")
-        for entry in _event_entries(e):
-            transform = _TIER_VIDEO_TRANSFORM.get(entry["tier"], str.title)
-            lines.append(f"    {transform(entry['text'])}")
-    for s in free_stratagems:
-        planets = s.get("planets") or []
-        planet_str = ", ".join(planets) if planets else "All active fronts"
-        lines.append(f"  {s['name'].strip()} — {planet_str}")
-    lines.append("")
+    lines = []
+    if events:
+        lines += [MAJOR_SEP, "FLEETWIDE STATUS", MAJOR_SEP]
+        for e in events:
+            if e.get("name", "").strip():
+                lines.append(f"  {e['name'].strip().upper()}")
+            for entry in _event_entries(e):
+                transform = _TIER_VIDEO_TRANSFORM.get(entry["tier"], str.title)
+                lines.append(f"    {transform(entry['text'])}")
+        lines.append("")
+    if equipment:
+        lines += [MAJOR_SEP, "FLEETWIDE EQUIPMENT", MAJOR_SEP]
+        for s in equipment:
+            lines.append(f"  {s['name'].strip().upper()}")
+        lines.append("")
     return lines
 
 
@@ -1044,6 +1120,8 @@ def _section_intel_video(parsed_data, flavor_texts):
 def _section_planets_video(parsed_data, classifications, flavor_texts):
     special_planet_events = _active_special_events(flavor_texts, parsed_data, "planets")
     special_fleetwide_events = _active_special_events(flavor_texts, parsed_data, "all")
+    equipment_planet = _active_equipment(flavor_texts, parsed_data, "planets")
+    gambit_summaries = _gambit_summaries(parsed_data)
     theater_flavors = flavor_texts.get("theaters", {})
     planet_flavors = flavor_texts.get("planets", {})
     dss = parsed_data.get("dss")
@@ -1071,6 +1149,7 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
         if theater_text:
             lines.append(theater_text)
         lines.append("")
+        lines.extend(_gambit_block_video(faction, gambit_summaries))
 
         for planet in theaters[faction]:
             is_def = planet["is_defense"]
@@ -1145,6 +1224,9 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
             for e in special_fleetwide_events:
                 if e.get("name", "").strip():
                     lines.append(f"    {e['name'].strip().upper()} (FLEETWIDE)")
+            for s in equipment_planet:
+                if planet["name"] in (s.get("planets") or []):
+                    lines.append(f"    {s['name'].strip().upper()} (EQUIPMENT)")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
@@ -1226,6 +1308,7 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
     orders = parsed_data.get("orders", [])
     dss = parsed_data.get("dss")
     mo_indices = _get_mo_planet_indices(parsed_data)
+    gambit_summaries = _gambit_summaries(parsed_data)
 
     mo_task_labels = []
     if orders:
@@ -1313,11 +1396,26 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
                 ],
             }
 
+        theater_gambits = []
+        for s in gambit_summaries:
+            if s["faction"] != faction:
+                continue
+            d, a = s["defender"], s["attacker"]
+            theater_gambits.append({
+                "defender_name": d["name"],
+                "defender_players": f"{d['player_count']:,}",
+                "defender_status": _gambit_defender_status(d),
+                "attacker_name": a["name"],
+                "attacker_players": f"{a['player_count']:,}",
+                "attacker_status": _gambit_attacker_status(a),
+            })
+
         result.append({
             "faction": faction,
             "planets": planet_refs,
             "mo": mo_ref,
             "dss": dss_ref,
+            "gambits": theater_gambits,
         })
 
     return result

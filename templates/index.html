@@ -343,6 +343,11 @@
     .pfe-lines { margin: 1px 0 0 14px; padding: 0; color: #999; }
     .pfe-lines li { font-size: 10px; }
     .theater-flavor-events { margin-top: 6px; }
+    .theater-gambits { margin: 6px 0; border-left: 2px solid #5a4a20; padding-left: 8px; }
+    .theater-gambits-label { font-size: 10px; color: #e0a838; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+    .tg-row { font-size: 11px; color: #c8b070; margin-bottom: 2px; }
+    .tg-def { color: #ffb060; font-weight: bold; }
+    .tg-atk { color: #ffd060; font-weight: bold; }
     .custom-planet-check.off-update { opacity: 0.85; }
     .off-update-tag { color: #a05050; font-style: italic; font-size: 10px; }
     /* Special Events Log */
@@ -571,15 +576,20 @@
     button.mod-reset-btn:hover { background: #251414; color: #c07070; }
 
     /* Free Stratagems rows */
-    .strat-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
+    .strat-row { margin-bottom: 8px; }
     input.strat-name {
       flex: 1; min-width: 200px;
       background: #111; border: 1px solid #2a2a2a; border-radius: 3px;
-      color: #c8c8c8; font-family: 'Courier New', monospace;
+      color: #7fd8e8; font-family: 'Courier New', monospace; font-weight: bold;
       font-size: 12px; padding: 4px 7px;
     }
     input.strat-name:focus { outline: none; border-color: #444; }
     input.strat-name::placeholder { color: #3a3a3a; }
+    /* Equipment read-only reference (cyan) in the flavor editor */
+    .pfe-equip { font-size: 11px; color: #5fc8d8; margin-bottom: 2px; }
+    .pfe-equip b { color: #8fe8f8; }
+    .flavor-fleetwide-equipment { margin: 4px 0 10px; }
+    .planet-flavor-equipment { margin-top: 4px; }
 
     /* Orders panel */
     .order-block {
@@ -834,6 +844,7 @@
              onchange="saveGlobalLimit(this.value)">
       <span style="font-size:10px;color:#555">(0 = no limit · all 3 fronts always included)</span>
     </div>
+    <div id="flavor-fleetwide-equipment" class="flavor-fleetwide-equipment" style="display:none"></div>
     <div id="theater-cards"></div>
     <!-- Special Events Log (archive of cleared events) -->
     <div class="special-events-log-wrap">
@@ -2033,6 +2044,31 @@
     });
   }
 
+  // Cyan read-only equipment reference: a fleetwide block at the top of the flavor editor
+  // plus a per-planet line for scope=planets equipment. Equipment items carry the same
+  // enabled/expires/linked_order_id fields, so _specialEventActiveJS gates them too.
+  function refreshEquipmentRefs(equipment) {
+    equipment = equipment || [];
+    const fw = document.getElementById('flavor-fleetwide-equipment');
+    if (fw) {
+      const active = equipment.filter(s => s.name && _specialEventActiveJS(s) && (s.scope || 'all') === 'all');
+      fw.innerHTML = active.length
+        ? '<div class="planet-flavor-events-label">Fleetwide Equipment (reference)</div>' +
+          active.map(s => `<div class="pfe-equip">&#8853; <b>${escHtml(s.name)}</b></div>`).join('')
+        : '';
+      fw.style.display = active.length ? 'block' : 'none';
+    }
+    document.querySelectorAll('.planet-flavor-equipment').forEach(div => {
+      const planet = div.dataset.planet;
+      const active = equipment.filter(s => s.name && _specialEventActiveJS(s) &&
+        (s.scope || 'all') === 'planets' && (s.planets || []).includes(planet));
+      div.innerHTML = active.length
+        ? active.map(s => `<div class="pfe-equip">&#8853; <b>${escHtml(s.name)}</b> available here</div>`).join('')
+        : '';
+      div.style.display = active.length ? 'block' : 'none';
+    });
+  }
+
   // ── Free Stratagems ───────────────────────────────────────────
 
   function buildFreeStratagemsPanel(flavor) {
@@ -2044,69 +2080,113 @@
       return;
     }
     for (const s of saved) {
-      list.appendChild(buildStratRow(s.name || '', s.planets || []));
+      list.appendChild(buildStratRow(s));
     }
   }
 
-  function buildStratRow(name, checkedPlanets) {
+  // Fleetwide equipment card — same scope/expiry/order-link mechanics as a special event,
+  // minus the tier entry rows and the archive log (kept a separate section by design).
+  function buildStratRow(s) {
+    s = s || {};
+    const scope = s.scope === 'planets' ? 'planets' : 'all';
     const row = document.createElement('div');
-    row.className = 'strat-row';
+    row.className = 'strat-row special-event-card';
+    row.dataset.expires = s.expires || '';
 
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'strat-name';
-    nameInput.placeholder = 'Stratagem or equipment name...';
-    nameInput.value = name;
-    nameInput.addEventListener('input', saveAllStrats);
-
-    const planetsWrap = document.createElement('div');
-    planetsWrap.className = 'custom-mod-planets';
-    for (const pname of _activePlanetNames) {
-      const lbl = document.createElement('label');
-      lbl.className = 'custom-planet-check';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = checkedPlanets.includes(pname);
-      cb.addEventListener('change', saveAllStrats);
-      lbl.appendChild(cb);
-      lbl.appendChild(document.createTextNode(pname));
-      planetsWrap.appendChild(lbl);
+    const evPlanets = s.planets || [];
+    const planetUnion = [..._activePlanetNames, ...evPlanets.filter(p => !_activePlanetNames.includes(p))];
+    let planetChecksHTML = '';
+    for (const pName of planetUnion) {
+      const offUpdate = !_activePlanetNames.includes(pName);
+      const isChecked = evPlanets.includes(pName);
+      planetChecksHTML += `<label class="custom-planet-check${offUpdate ? ' off-update' : ''}"><input type="checkbox" data-planet="${escHtml(pName)}" ${isChecked ? 'checked' : ''}> ${escHtml(pName)}${offUpdate ? ' <span class="off-update-tag">(off update)</span>' : ''}</label>`;
     }
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'custom-mod-del';
-    delBtn.textContent = '✕';
-    delBtn.addEventListener('click', () => { row.remove(); saveAllStrats(); });
+    row.innerHTML = `
+      <div class="special-event-row">
+        <input type="text" class="strat-name" placeholder="Equipment / stratagem name..." value="${escHtml(s.name || '')}">
+        <label class="custom-planet-check"><input type="checkbox" class="strat-enabled" ${s.enabled === false ? '' : 'checked'}> On</label>
+        <button type="button" class="custom-mod-del strat-del" title="Remove">×</button>
+      </div>
+      <div class="special-event-row">
+        <span class="special-event-field-label">Scope</span>
+        <select class="special-event-select strat-scope">
+          <option value="all" ${scope === 'all' ? 'selected' : ''}>All planets (fleetwide)</option>
+          <option value="planets" ${scope === 'planets' ? 'selected' : ''}>Specific planets</option>
+        </select>
+        <div class="strat-planets special-event-planets" style="${scope === 'planets' ? '' : 'display:none'}">${planetChecksHTML}</div>
+      </div>
+      <div class="special-event-row">
+        <span class="special-event-field-label">Link to order</span>
+        <select class="special-event-select strat-link">${_orderLinkOptions(s.linked_order_id)}</select>
+        <span class="special-event-field-label">Time left</span>
+        <input type="text" class="special-event-expiry strat-expiry" placeholder="e.g. 2d 5h or 90m" value="${_formatRemaining(s.expires)}">
+      </div>
+    `;
 
-    row.appendChild(nameInput);
-    row.appendChild(planetsWrap);
-    row.appendChild(delBtn);
+    const save = () => saveAllStrats();
+    row.querySelector('.strat-name').addEventListener('input', save);
+    row.querySelector('.strat-enabled').addEventListener('change', save);
+    row.querySelector('.strat-link').addEventListener('change', save);
+    const expiryInput = row.querySelector('.strat-expiry');
+    expiryInput.addEventListener('change', () => {
+      const ms = _parseDuration(expiryInput.value);
+      row.dataset.expires = (ms != null) ? new Date(Date.now() + ms).toISOString() : '';
+      save();
+    });
+    const scopeSel = row.querySelector('.strat-scope');
+    scopeSel.addEventListener('change', () => {
+      row.querySelector('.strat-planets').style.display = scopeSel.value === 'planets' ? '' : 'none';
+      save();
+    });
+    row.querySelectorAll('.strat-planets input').forEach(cb => cb.addEventListener('change', save));
+    row.querySelector('.strat-del').addEventListener('click', () => { row.remove(); _ensureStratEmpty(); saveAllStrats(); });
     return row;
+  }
+
+  function _ensureStratEmpty() {
+    const list = document.getElementById('strat-list');
+    if (list && !list.querySelector('.strat-row')) {
+      list.innerHTML = '<div class="no-hazards" id="strat-empty">No fleetwide equipment — click + Add.</div>';
+    }
   }
 
   function addStratRow() {
     const list = document.getElementById('strat-list');
     const empty = document.getElementById('strat-empty');
     if (empty) empty.remove();
-    const row = buildStratRow('', []);
+    const row = buildStratRow({ enabled: true, scope: 'all' });
     list.appendChild(row);
     row.querySelector('.strat-name').focus();
   }
 
-  function saveAllStrats() {
+  function _collectStrats() {
     const stratagems = [];
     document.querySelectorAll('#strat-list .strat-row').forEach(row => {
       const name = row.querySelector('.strat-name').value.trim();
-      const planets = [...row.querySelectorAll('.custom-planet-check input')]
-        .filter(cb => cb.checked)
-        .map(cb => cb.closest('.custom-planet-check').textContent.trim());
-      if (name) stratagems.push({ name, planets });
+      if (!name) return;
+      const scope = row.querySelector('.strat-scope').value === 'planets' ? 'planets' : 'all';
+      const planets = scope === 'planets'
+        ? [...row.querySelectorAll('.strat-planets input')].filter(cb => cb.checked).map(cb => cb.dataset.planet)
+        : [];
+      stratagems.push({
+        name, scope, planets,
+        enabled: row.querySelector('.strat-enabled').checked,
+        expires: row.dataset.expires || null,
+        linked_order_id: row.querySelector('.strat-link').value || null,
+      });
     });
+    return stratagems;
+  }
+
+  function saveAllStrats() {
+    const stratagems = _collectStrats();
     fetch('/save_free_stratagems', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stratagems }),
     });
+    if (typeof refreshEquipmentRefs === 'function') refreshEquipmentRefs(stratagems);
     scheduleReformat();
   }
 
@@ -2173,9 +2253,17 @@
       writePanel.className = 'flavor-write-panel';
       const savedTheater = theaterFlavors[faction] || '';
       const _theaterPlanetNames = theater.planets.map(p => p.name);
+      const gambitsHtml = (theater.gambits && theater.gambits.length)
+        ? '<div class="theater-gambits"><div class="theater-gambits-label">&#9876; Gambits</div>' +
+          theater.gambits.map(g =>
+            `<div class="tg-row"><span class="tg-def">Defending:</span> ${escHtml(g.defender_name)} — ${escHtml(g.defender_players)} players — ${escHtml(g.defender_status)}</div>` +
+            `<div class="tg-row"><span class="tg-atk">Attacking:</span> ${escHtml(g.attacker_name)} — ${escHtml(g.attacker_players)} players — ${escHtml(g.attacker_status)}</div>`
+          ).join('') + '</div>'
+        : '';
       writePanel.innerHTML = `
         <label>Theater flavor text</label>
         <textarea class="flavor-textarea" data-scope="theaters" data-key="${escHtml(faction)}">${escHtml(savedTheater)}</textarea>
+        ${gambitsHtml}
         <div class="theater-flavor-events" data-planets="${escHtml(_theaterPlanetNames.join('|'))}"></div>
       `;
 
@@ -2202,6 +2290,7 @@
           </label>
           <textarea class="planet-flavor-text ${hasText ? 'visible' : ''}"
             data-scope="planets" data-key="${escHtml(planet.name)}">${escHtml(saved)}</textarea>
+          <div class="planet-flavor-equipment" data-planet="${escHtml(planet.name)}"></div>
           <div class="planet-flavor-events" data-planet="${escHtml(planet.name)}"></div>
         `;
         planetSection.appendChild(item);
@@ -2223,6 +2312,7 @@
     });
 
     refreshPlanetEventRefs((flavor && flavor.special_events) || []);
+    refreshEquipmentRefs((flavor && flavor.free_stratagems) || []);
   }
 
   function attachClearUndo(ta) {

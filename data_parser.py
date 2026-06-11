@@ -320,6 +320,30 @@ def _build_dispatches(dispatches_data):
     return results
 
 
+def _build_gambits(planets_by_index, campaign_indices):
+    """Finds gambit pairs: liberating the enemy-held ATTACKER instantly defends the
+    DEFENDER (the planet with an active defense event) if done before its timer expires.
+    Returns [{defender, attacker}] (planet indices).
+
+    Robust against the symmetric / supply-line edges that also exist in the attack graph:
+    the attacker must be enemy-held with owner matching the defense event's faction AND be
+    an active liberation campaign — not merely linked to the defender."""
+    gambits = []
+    for d_idx, d in planets_by_index.items():
+        ev = d.get("event") or {}
+        if ev.get("eventType") != 1:
+            continue
+        atk_faction = ev.get("faction")
+        for a_idx, a in planets_by_index.items():
+            if a_idx == d_idx:
+                continue
+            if (d_idx in (a.get("attacking") or [])
+                    and a.get("currentOwner") == atk_faction
+                    and a_idx in campaign_indices):
+                gambits.append({"defender": d_idx, "attacker": a_idx})
+    return gambits
+
+
 def parse_all():
     planets_data = _load("planets.json")
     campaigns_data = _load("campaigns.json")
@@ -331,10 +355,59 @@ def parse_all():
     impact_multiplier = war_data["impactMultiplier"]
 
     campaigns_by_index = {c["planet"]["index"]: c for c in campaigns_data}
+    planets_by_index = {p["index"]: p for p in planets_data}
+    campaign_indices = set(campaigns_by_index)
 
     effects_by_index = _build_effects_by_index()
     top_planets = sorted(planets_data, key=lambda p: p["statistics"]["playerCount"], reverse=True)[:5]
-    planets = [_build_planet(p, campaigns_by_index, effects_by_index) for p in top_planets]
+    top_indices = {p["index"] for p in top_planets}
+
+    # Every active enemy front contributes its top-by-players planet, so the 3-front
+    # guarantee (and "0 = all 3 fronts" mode) always has a candidate even when the global
+    # top-5 is one-sided. Front = enemy faction (event faction for defenses, else owner).
+    front_tops = {}
+    for idx in campaign_indices:
+        pl = planets_by_index.get(idx)
+        if not pl:
+            continue
+        ev = pl.get("event") or {}
+        enemy = ev.get("faction") if ev.get("eventType") == 1 else pl.get("currentOwner")
+        if enemy in (None, "Humans"):
+            continue
+        pc = pl["statistics"]["playerCount"]
+        if enemy not in front_tops or pc > front_tops[enemy][0]:
+            front_tops[enemy] = (pc, idx)
+    front_indices = [v[1] for v in front_tops.values()]
+
+    # Gambits: only surface a pair when at least one side is already a top planet.
+    gambits = [g for g in _build_gambits(planets_by_index, campaign_indices)
+               if g["defender"] in top_indices or g["attacker"] in top_indices]
+    gambit_by_index = {}
+    for g in gambits:
+        gambit_by_index[g["defender"]] = {"role": "defender", "partner_index": g["attacker"],
+                                          "partner_name": planets_by_index[g["attacker"]]["name"]}
+        gambit_by_index[g["attacker"]] = {"role": "attacker", "partner_index": g["defender"],
+                                          "partner_name": planets_by_index[g["defender"]]["name"]}
+
+    # Build the top-5 + each front's top planet + gambit partners. dict.fromkeys dedups
+    # while keeping top planets in their player-ranked position.
+    front_idx_set = set(front_indices)
+    gambit_idx_set = {g[k] for g in gambits for k in ("defender", "attacker")}
+    build_indices = list(dict.fromkeys(
+        [p["index"] for p in top_planets]
+        + front_indices
+        + [g[k] for g in gambits for k in ("defender", "attacker")]
+    ))
+    planets = []
+    for idx in build_indices:
+        pl = _build_planet(planets_by_index[idx], campaigns_by_index, effects_by_index)
+        # gambit_added = present ONLY as a gambit partner (not a top-5 nor a front rep),
+        # so it does not count toward the display limit — it rides in via gambit closure.
+        if idx not in top_indices and idx not in front_idx_set and idx in gambit_idx_set:
+            pl["gambit_added"] = True
+        if idx in gambit_by_index:
+            pl["gambit"] = gambit_by_index[idx]
+        planets.append(pl)
 
     return {
         "planets": planets,
@@ -343,5 +416,6 @@ def parse_all():
         "dss": _build_dss(dss_data),
         "dispatches": _build_dispatches(dispatches_data),
         "all_effects_by_index": effects_by_index,  # galaxy-wide, for the effects editor/flag area
+        "gambits": gambits,
         "meta": {"impact_multiplier": impact_multiplier},
     }

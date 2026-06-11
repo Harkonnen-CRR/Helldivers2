@@ -16,14 +16,13 @@ CLASSIFICATIONS_PATH = "data/classifications.json"
 FLAVOR_PATH = "data/flavor.json"
 
 # Keys stored in flavor.json and loaded across sessions
-_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels", "effect_formats", "special_events", "special_events_log"}
+_PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "planet_modifiers", "custom_modifiers", "order_labels", "effect_formats", "special_events", "special_events_log", "free_stratagems"}
 
 # Session-only defaults — reset on every page load, never written to disk
 _SESSION_DEFAULTS = {
     "limits": {},
     "excluded_theaters": [],
     "selected_dispatches": [],
-    "free_stratagems": [],
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
     "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
@@ -115,6 +114,7 @@ def _load_flavor():
         "theaters": {}, "planets": {}, "planet_notes": {},
         "planet_tags": {}, "planet_modifiers": {}, "custom_modifiers": [],
         "order_labels": {}, "effect_formats": {}, "special_events": [], "special_events_log": [],
+        "free_stratagems": [],
     }
     if os.path.exists(FLAVOR_PATH):
         with open(FLAVOR_PATH) as f:
@@ -514,6 +514,20 @@ def save_custom_modifiers():
     return jsonify({"status": "ok"})
 
 
+def _normalize_timed_fields(e):
+    """Shared scope/activation fields for special events AND fleetwide equipment:
+    scope ('all'|'planets'), planets, enabled, expires, linked_order_id."""
+    scope = "planets" if e.get("scope") == "planets" else "all"
+    linked = e.get("linked_order_id")
+    return {
+        "scope": scope,
+        "planets": [p for p in (e.get("planets") or []) if isinstance(p, str)] if scope == "planets" else [],
+        "enabled": bool(e.get("enabled", True)),
+        "expires": ((e.get("expires") or "").strip() or None),
+        "linked_order_id": (str(linked) if linked else None),
+    }
+
+
 def _normalize_special_event(e):
     """Validates/normalizes one special-event dict. Returns the cleaned dict, or None
     if it has neither a name nor any non-empty entry. Shared by save + archive."""
@@ -533,17 +547,17 @@ def _normalize_special_event(e):
             entries.append({"text": text, "tier": tier})
     if not (name or entries):
         return None
-    scope = "planets" if e.get("scope") == "planets" else "all"
-    linked = e.get("linked_order_id")
-    return {
-        "name": name,
-        "lines": entries,
-        "scope": scope,
-        "planets": [p for p in (e.get("planets") or []) if isinstance(p, str)] if scope == "planets" else [],
-        "enabled": bool(e.get("enabled", True)),
-        "expires": ((e.get("expires") or "").strip() or None),
-        "linked_order_id": (str(linked) if linked else None),
-    }
+    return {"name": name, "lines": entries, **_normalize_timed_fields(e)}
+
+
+def _normalize_equipment(e):
+    """One fleetwide-equipment item: a name + the shared timed fields. None if no name."""
+    if not isinstance(e, dict):
+        return None
+    name = (e.get("name") or "").strip()
+    if not name:
+        return None
+    return {"name": name, **_normalize_timed_fields(e)}
 
 
 @app.route("/save_special_events", methods=["POST"])
@@ -604,11 +618,11 @@ def save_faction_modifier():
 
 @app.route("/save_free_stratagems", methods=["POST"])
 def save_free_stratagems():
-    data = request.get_json()
-    stratagems = data.get("stratagems", [])
-    state["session"]["free_stratagems"] = [
-        s for s in stratagems if isinstance(s, dict) and s.get("name", "").strip()
-    ]
+    """Persists fleetwide equipment (now persistent + scope/expiry/order-link aware)."""
+    data = request.get_json() or {}
+    valid = [ne for s in data.get("stratagems", []) if (ne := _normalize_equipment(s))]
+    state["flavor"]["free_stratagems"] = valid
+    _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
 
