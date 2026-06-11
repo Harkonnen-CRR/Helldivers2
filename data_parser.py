@@ -28,6 +28,17 @@ _ORDER_TITLE_DEFAULTS = {
     "STRATEGIC OPPORTUNITY": "ALERT: STRATEGIC OPPORTUNITY IDENTIFIED",
 }
 
+# Gambit surfacing (flavor/update output): at most ONE gambit per theater — the most
+# prominent pull. A gambit needs the community massed on it to be executable, so we only
+# surface one when its duo (defending + attacking players) commands at least
+# GAMBIT_SHARE_THRESHOLD of that theater's Helldivers; below that, players are too spread
+# out to coordinate a pull and we surface none. When two gambits' duos are within
+# GAMBIT_DUO_TIE_BAND of each other (as a share of theater pop), they count as "roughly
+# equal" and the tie breaks to the larger ATTACKER turnout — the side actually executing
+# the pull. (The full multi-gambit list is a future Discord-bot concern, not this output.)
+GAMBIT_SHARE_THRESHOLD = 0.40
+GAMBIT_DUO_TIE_BAND = 0.10
+
 _EFFECT_LABELS_PATH = os.path.join("fixtures", "effect_labels.json")
 _PLANET_EFFECTS_PATH = os.path.join("data", "planet_effects.json")
 
@@ -366,6 +377,7 @@ def parse_all():
     # guarantee (and "0 = all 3 fronts" mode) always has a candidate even when the global
     # top-5 is one-sided. Front = enemy faction (event faction for defenses, else owner).
     front_tops = {}
+    theater_pop = {}  # total players per enemy front — the denominator for gambit share
     for idx in campaign_indices:
         pl = planets_by_index.get(idx)
         if not pl:
@@ -375,13 +387,37 @@ def parse_all():
         if enemy in (None, "Humans"):
             continue
         pc = pl["statistics"]["playerCount"]
+        theater_pop[enemy] = theater_pop.get(enemy, 0) + pc
         if enemy not in front_tops or pc > front_tops[enemy][0]:
             front_tops[enemy] = (pc, idx)
     front_indices = [v[1] for v in front_tops.values()]
 
-    # Gambits: only surface a pair when at least one side is already a top planet.
-    gambits = [g for g in _build_gambits(planets_by_index, campaign_indices)
-               if g["defender"] in top_indices or g["attacker"] in top_indices]
+    # Gambits: one prominent pull per theater, gated on community concentration (see the
+    # GAMBIT_* constants). Replaces the old "either side in the global top-5" gate, which
+    # surfaced irrelevant pulls whenever a high-turnout DEFENDING planet rode into the top-5.
+    def _duo_pop(g):
+        return (planets_by_index[g["defender"]]["statistics"]["playerCount"]
+                + planets_by_index[g["attacker"]]["statistics"]["playerCount"])
+
+    def _attacker_pop(g):
+        return planets_by_index[g["attacker"]]["statistics"]["playerCount"]
+
+    gambits_by_theater = {}
+    for g in _build_gambits(planets_by_index, campaign_indices):
+        faction = (planets_by_index[g["defender"]].get("event") or {}).get("faction")
+        gambits_by_theater.setdefault(faction, []).append(g)
+
+    gambits = []
+    for faction, group in gambits_by_theater.items():
+        total = theater_pop.get(faction, 0)
+        if not total:
+            continue
+        lead = max(_duo_pop(g) for g in group)
+        # Roughly-equal duos (within the tie band) defer to the larger attacker turnout.
+        contenders = [g for g in group if _duo_pop(g) >= lead - GAMBIT_DUO_TIE_BAND * total]
+        top = max(contenders, key=_attacker_pop)
+        if _duo_pop(top) / total >= GAMBIT_SHARE_THRESHOLD:
+            gambits.append(top)
     gambit_by_index = {}
     for g in gambits:
         gambit_by_index[g["defender"]] = {"role": "defender", "partner_index": g["attacker"],
