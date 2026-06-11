@@ -137,9 +137,14 @@ def _parse_expire(s):
     if not s:
         return None
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
+    # Naive timestamps (e.g. a hand-edited special-event expiry) are assumed UTC so
+    # comparisons against datetime.now(timezone.utc) never raise aware/naive TypeErrors.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _time_remaining_hours(expire_str):

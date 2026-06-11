@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import shutil
 from datetime import datetime, timezone, timedelta
 
 from flask import Flask, jsonify, render_template, request
@@ -144,11 +145,37 @@ def _load_flavor():
 
 
 def _save_flavor(flavor):
-    """Writes only persistent keys to disk."""
+    """Writes only persistent keys to disk, with two safeguards against data loss:
+
+    1. Anti-clobber: if the incoming flavor is missing persistent keys that the on-disk
+       file already has, that is the signature of a save running before _load_flavor
+       populated state. We back the file up and SKIP the write rather than wipe data.
+    2. Rolling backup: every successful write first copies the current file to .bak,
+       so the previous good version is always one step recoverable.
+    """
     os.makedirs("data", exist_ok=True)
     persistent = {k: v for k, v in flavor.items() if k in _PERSISTENT_KEYS}
+    if os.path.exists(FLAVOR_PATH):
+        try:
+            with open(FLAVOR_PATH) as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+        existing_keys = {k for k in existing if k in _PERSISTENT_KEYS}
+        if existing_keys and not set(persistent).issuperset(existing_keys):
+            shutil.copy(FLAVOR_PATH, FLAVOR_PATH + ".bak")
+            print(f"[WARN] _save_flavor refused to overwrite flavor.json: in-memory "
+                  f"flavor is missing keys present on disk {existing_keys - set(persistent)}. "
+                  f"Backed up to {FLAVOR_PATH}.bak; write skipped. Load flavor before saving.")
+            return
+        shutil.copy(FLAVOR_PATH, FLAVOR_PATH + ".bak")
     with open(FLAVOR_PATH, "w") as f:
         json.dump(persistent, f, indent=2)
+
+
+# Load persisted flavor at import so state["flavor"] is populated before any save route
+# can run (a save before the first page load previously could overwrite the file empty).
+state["flavor"] = _load_flavor()
 
 
 def _get_classification_items(raw_planets):
@@ -483,6 +510,36 @@ def save_custom_modifiers():
         if isinstance(m, dict) and m.get("text", "").strip()
     ]
     state["flavor"]["custom_modifiers"] = valid
+    _save_flavor(state["flavor"])
+    return jsonify({"status": "ok"})
+
+
+@app.route("/save_special_events", methods=["POST"])
+def save_special_events():
+    """Persists the full special_events list. Drops empty bundles (no name and no
+    non-blank lines); normalizes scope/planets/enabled/expires/linked_order_id."""
+    data = request.get_json() or {}
+    events = data.get("events", [])
+    valid = []
+    for e in events:
+        if not isinstance(e, dict):
+            continue
+        name = (e.get("name") or "").strip()
+        lines = [l.strip() for l in (e.get("lines") or []) if isinstance(l, str) and l.strip()]
+        if not (name or lines):
+            continue
+        scope = "planets" if e.get("scope") == "planets" else "all"
+        linked = e.get("linked_order_id")
+        valid.append({
+            "name": name,
+            "lines": lines,
+            "scope": scope,
+            "planets": [p for p in (e.get("planets") or []) if isinstance(p, str)] if scope == "planets" else [],
+            "enabled": bool(e.get("enabled", True)),
+            "expires": ((e.get("expires") or "").strip() or None),
+            "linked_order_id": (str(linked) if linked else None),
+        })
+    state["flavor"]["special_events"] = valid
     _save_flavor(state["flavor"])
     return jsonify({"status": "ok"})
 
