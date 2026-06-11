@@ -455,3 +455,23 @@ def parse_all():
         "gambits": gambits,
         "meta": {"impact_multiplier": impact_multiplier},
     }
+
+
+def build_planet_by_index(index):
+    """Build a single planet's reference dict for ANY of the galaxy's planets by index — not
+    just the displayed (top/front/gambit) set parse_all() returns. Powers the planet search +
+    pin feature. Reuses _build_planet, so a non-campaign planet comes back with its static
+    reference (sector/biome/description/regions/owner/players) but no live liberation rate —
+    that needs the two-snapshot flow, which only runs for active campaigns."""
+    index = int(index)
+    planet = next((p for p in _load("planets.json") if p["index"] == index), None)
+    if planet is None:
+        return None
+    campaigns_by_index = {c["planet"]["index"]: c for c in _load("campaigns.json")}
+    return _build_planet(planet, campaigns_by_index, _build_effects_by_index())
+
+
+def list_all_planets():
+    """[{index, name}] for every galaxy planet, name-sorted — for the search datalist."""
+    return sorted(({"index": p["index"], "name": p["name"]} for p in _load("planets.json")),
+                  key=lambda x: x["name"])
