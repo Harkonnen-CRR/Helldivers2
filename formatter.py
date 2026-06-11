@@ -277,9 +277,9 @@ def _get_task_status_info(task, task_idx, order, mo_task_statuses, top_planets_b
 def _format_region_status(region):
     if not region.get("players", 0):
         return "Secure"
-    health = region.get("health", 0)
+    health = region.get("health")
     max_health = region.get("max_health", 0)
-    pct = (1 - health / max_health) * 100 if max_health else 0.0
+    pct = (1 - health / max_health) * 100 if (max_health and health is not None) else 0.0
     if pct < 0.1:
         return "Performing recon..."
     if pct <= 3.0:
@@ -1008,7 +1008,7 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
                 lines.append("")
                 lines.append("__**Population Centers:**__")
                 for r in active_regions:
-                    pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
+                    pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if (r["max_health"] and r["health"] is not None) else 0.0
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
                     status_str = f"**{status}**" if ("Secured in" in status or "Lost in" in status) else status
@@ -1240,7 +1240,7 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
             if active_regions:
                 lines.append("    Population Centers:")
                 for r in active_regions:
-                    pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
+                    pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if (r["max_health"] and r["health"] is not None) else 0.0
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
                     lines.append(f"      {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
@@ -1352,7 +1352,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
                 time_status = f"Time to Liberation: {lib_str}" if p["liberation_time_hours"] is not None else lib_str
             regions = []
             for r in p.get("regions", []):
-                pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if r["max_health"] else 0.0
+                pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if (r["max_health"] and r["health"] is not None) else 0.0
                 regions.append({
                     "name": r["name"],
                     "size": r.get("size", ""),
