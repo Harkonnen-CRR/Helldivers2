@@ -2,6 +2,25 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+
+# Super Earth Standard Time = Arrowhead Game Studios' home timezone (Stockholm).
+# The official companion app renders the game's UTC backend in this zone, so we mirror it.
+_SEST_ZONE = ZoneInfo("Europe/Stockholm")
+_SEST_YEAR_OFFSET = 160  # real year + 160 → in-universe projected year (2026 → 2186)
+
+
+def _build_sest_stamp(now=None):
+    """Star Trek-style SEST timestamp: '{projected_year}.{day_of_year}-{HHMMSS}SEST'.
+
+    Computed live at format time (not parse time) so every output — full, reformat,
+    and Quick Update — stamps the actual moment it is generated. Entirely
+    Stockholm-derived (date and clock share one timezone), so the day-of-year follows
+    SEST and can read 'tomorrow' relative to a US evening. Example: 2186.162-024418SEST
+    """
+    now = (now or datetime.now(timezone.utc)).astimezone(_SEST_ZONE)
+    return f"{now.year + _SEST_YEAR_OFFSET}.{now.strftime('%j')}-{now.strftime('%H%M%S')}SEST"
 
 
 # type 0 = Medals confirmed; Cape seen in the wild but type number unverified
@@ -865,7 +884,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None, sections=Non
         "planets":   lambda: _section_planets_discord(parsed_data, classifications, flavor_texts),
         "dss":       lambda: _section_dss_discord(parsed_data),
     }
-    lines = []
+    lines = [f"**Galactic War Update: {_build_sest_stamp()}**", ""]
     for key in SECTION_KEYS:
         if key in sections:
             lines.extend(renderers[key]())
@@ -1065,7 +1084,7 @@ def format_video(parsed_data, classifications, flavor_texts=None, sections=None)
     """
     flavor_texts = flavor_texts or {}
     sections = SECTION_KEYS if sections is None else sections
-    lines = [MAJOR_SEP, "GALACTIC WAR UPDATE", MAJOR_SEP, ""]
+    lines = [MAJOR_SEP, f"GALACTIC WAR UPDATE: {_build_sest_stamp()}", MAJOR_SEP, ""]
     renderers = {
         "orders":    lambda: _section_orders_video(parsed_data, flavor_texts),
         "fleetwide": lambda: _section_fleetwide_video(parsed_data, flavor_texts),
