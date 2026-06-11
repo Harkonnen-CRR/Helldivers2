@@ -8,7 +8,7 @@ from flask import Flask, jsonify, render_template, request
 
 import wiki_lore
 from api_client import fetch_all, ping, ApiError
-from data_parser import parse_all, build_planet_by_index, list_all_planets
+from data_parser import parse_all, build_planet_by_index, list_all_planets, top_populated_indices
 from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data
 
 app = Flask(__name__)
@@ -532,6 +532,19 @@ def remove_planet():
     removed = state["session"]["removed_planets"]
     if index not in removed:
         removed.append(index)
+    if state["last_parsed"] is None:
+        return jsonify({"status": "ok"})
+    return jsonify(_board_response())
+
+
+@app.route("/restore_top5", methods=["POST"])
+def restore_top5():
+    """Make sure the 5 most-populated planets (the auto-pull seed) are back on the board —
+    un-remove any that had been taken off. Returns the rebuilt board."""
+    removed = state["session"]["removed_planets"]
+    for idx in top_populated_indices(5):
+        if idx in removed:
+            removed.remove(idx)
     if state["last_parsed"] is None:
         return jsonify({"status": "ok"})
     return jsonify(_board_response())

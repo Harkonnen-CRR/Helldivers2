@@ -475,3 +475,10 @@ def list_all_planets():
     """[{index, name}] for every galaxy planet, name-sorted — for the search datalist."""
     return sorted(({"index": p["index"], "name": p["name"]} for p in _load("planets.json")),
                   key=lambda x: x["name"])
+
+
+def top_populated_indices(n=5):
+    """The n most-populated planet indices — the same set the auto-pull seeds the board with.
+    Powers the 'Restore top 5' button."""
+    planets = sorted(_load("planets.json"), key=lambda p: p["statistics"]["playerCount"], reverse=True)
+    return [p["index"] for p in planets[:n]]
