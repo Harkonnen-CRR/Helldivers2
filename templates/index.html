@@ -239,6 +239,11 @@
       border-radius: 3px; padding: 1px 7px; cursor: pointer; white-space: nowrap;
     }
     .unpin-btn:hover { background: #26263a; border-color: #5a5a7a; }
+    .ref-planet.pin-flash { animation: pinFlash 1.5s ease-out; }
+    @keyframes pinFlash {
+      0% { box-shadow: 0 0 0 2px #8a8ab0, 0 0 12px #5a5a8a; }
+      100% { box-shadow: none; }
+    }
     .ref-planet.planet-hidden { opacity: 0.45; }
     .ref-planet.planet-hidden .ref-planet-name::after {
       content: ' (hidden)'; font-size: 10px; color: #888; font-weight: normal; letter-spacing: 0;
@@ -1539,27 +1544,41 @@
 
   async function pinSearchedPlanet() {
     const input = document.getElementById('planet-search-input');
-    const name = (input.value || '').trim().toLowerCase();
-    if (!name) return;
-    const index = planetSearchByName[name];
-    if (index === undefined) { setStatus(`No planet named "${input.value}".`); return; }
-    const res = await fetch('/pin_planet', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ index }),
-    });
-    const data = await res.json();
-    if (data.status !== 'ok') { setStatus(data.message || 'Could not pin planet.'); return; }
-    input.value = '';
-    applyPinResponse(data);
+    const typed = (input.value || '').trim();
+    if (!typed) return;
+    const index = planetSearchByName[typed.toLowerCase()];
+    if (index === undefined) { setStatus(`No planet named "${typed}".`); return; }
+    setStatus(`Pinning ${typed}…`);
+    try {
+      const res = await fetch('/pin_planet', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') { setStatus(data.message || 'Could not pin planet.'); return; }
+      input.value = '';
+      applyPinResponse(data);
+      if (data.theaters) { flashPinnedCard(index); setStatus(`Pinned ${typed} — toggle Show to broadcast it.`); }
+      else setStatus(`Pinned ${typed} — run Calculations to display it.`);
+    } catch (e) {
+      setStatus('Pin failed — see server log.');
+    }
   }
 
   async function unpinPlanet(index) {
-    const res = await fetch('/unpin_planet', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ index }),
-    });
-    const data = await res.json();
-    if (data.status === 'ok') applyPinResponse(data);
+    setStatus('Unpinning…');
+    try {
+      const res = await fetch('/unpin_planet', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') { setStatus(data.message || 'Could not unpin.'); return; }
+      applyPinResponse(data);
+      setStatus('Unpinned.');
+    } catch (e) {
+      setStatus('Unpin failed — see server log.');
+    }
   }
 
   // Re-render the editor + output boxes from a /pin or /unpin response.
@@ -1570,6 +1589,15 @@
       document.getElementById('out-video').value = data.video;
       updateCharCount();
     }
+  }
+
+  // Scroll to a freshly-pinned card and briefly highlight it so the change is obvious.
+  function flashPinnedCard(index) {
+    const card = document.querySelector(`.ref-planet[data-planet-index="${index}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('pin-flash');
+    setTimeout(() => card.classList.remove('pin-flash'), 1500);
   }
 
   function addManualOrder() {
