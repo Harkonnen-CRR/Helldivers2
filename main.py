@@ -238,11 +238,29 @@ def _apply_board(parsed):
     return out
 
 
+def _current_parsed():
+    """War-state to render the board from: the live last_parsed (with liberation rates) once a
+    Run Calculations has completed, else a fresh parse of the LAST CACHED data/*.json — NO live
+    API call. So add/remove/restore keep working even with the API down or right after a server
+    restart (which clears last_parsed). Returns None only if no data has ever been cached."""
+    if state["last_parsed"] is not None:
+        return state["last_parsed"]
+    try:
+        return _inject_mock_order(parse_all())
+    except Exception:
+        return None
+
+
 def _board_response():
-    """Rebuild the editor theaters + output from last_parsed with the board applied —
-    the payload returned by /pin_planet and /remove_planet so the UI updates in place."""
+    """Rebuild the editor theaters + output with the board applied — returned by /pin_planet,
+    /remove_planet and /restore_top5 so the UI updates in place. Works from cached data when
+    last_parsed is unset; without a completed two-snapshot calc, pinned/cached planets show
+    reference + status but no live liberation rate."""
+    parsed = _current_parsed()
+    if parsed is None:
+        return {"status": "ok", "message": "No cached planet data yet — run Calculations once."}
     merged = _merged_flavor()
-    pp = _apply_board(state["last_parsed"])
+    pp = _apply_board(parsed)
     theaters = get_theater_data(pp, state["classifications"], merged.get("planet_modifiers", {}),
                                 planet_visibility=merged.get("planet_visibility", {}))
     return {
@@ -514,8 +532,6 @@ def pin_planet():
     pins = state["session"]["pinned_planets"]
     if index not in pins:
         pins.append(index)
-    if state["last_parsed"] is None:
-        return jsonify({"status": "ok"})  # nothing to rebuild yet; next refresh will include it
     return jsonify(_board_response())
 
 
@@ -532,8 +548,6 @@ def remove_planet():
     removed = state["session"]["removed_planets"]
     if index not in removed:
         removed.append(index)
-    if state["last_parsed"] is None:
-        return jsonify({"status": "ok"})
     return jsonify(_board_response())
 
 
@@ -545,8 +559,6 @@ def restore_top5():
     for idx in top_populated_indices(5):
         if idx in removed:
             removed.remove(idx)
-    if state["last_parsed"] is None:
-        return jsonify({"status": "ok"})
     return jsonify(_board_response())
 
 
