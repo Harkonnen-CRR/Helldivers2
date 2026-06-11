@@ -20,10 +20,10 @@ _PERSISTENT_KEYS = {"theaters", "planets", "planet_notes", "planet_tags", "plane
 
 # Session-only defaults — reset on every page load, never written to disk
 _SESSION_DEFAULTS = {
-    "limits": {},
     "excluded_theaters": [],
     "selected_dispatches": [],
     "order_visibility": {},   # {str(assignment_id): bool} — True by default
+    "planet_visibility": {},  # {str(planet_index): bool} — True by default (per-planet show/hide)
     "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
@@ -247,7 +247,7 @@ def refresh():
     }
 
     merged = _merged_flavor()
-    theaters = get_theater_data(parsed, merged.get("limits", {}), state["classifications"], merged.get("planet_modifiers", {}))
+    theaters = get_theater_data(parsed, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
     modifier_panel = get_modifier_panel_data(parsed, merged)
 
     return jsonify({
@@ -305,7 +305,7 @@ def fetch2():
 
     state["last_parsed"] = parsed
     merged = _merged_flavor()
-    theaters = get_theater_data(parsed, merged.get("limits", {}), state["classifications"], merged.get("planet_modifiers", {}))
+    theaters = get_theater_data(parsed, state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}))
     modifier_panel = get_modifier_panel_data(parsed, merged)
     discord_text = format_discord(parsed, state["classifications"], merged)
     video_text = format_video(parsed, state["classifications"], merged)
@@ -412,6 +412,23 @@ def save_order_visibility():
     return jsonify({"status": "ok"})
 
 
+@app.route("/save_planet_visibility", methods=["POST"])
+def save_planet_visibility():
+    """Per-planet show/hide toggle. Session-only; True (shown) is the default, so we only
+    store an entry when a planet is hidden and drop it again when re-shown (keeps state lean)."""
+    data = request.get_json()
+    index = data.get("index")
+    visible = data.get("visible", True)
+    if index is None:
+        return jsonify({"status": "error", "message": "Missing index"}), 400
+    vis = state["session"]["planet_visibility"]
+    if visible:
+        vis.pop(str(index), None)       # back to default (shown)
+    else:
+        vis[str(index)] = False
+    return jsonify({"status": "ok"})
+
+
 @app.route("/save_manual_orders", methods=["POST"])
 def save_manual_orders():
     data = request.get_json()
@@ -460,20 +477,6 @@ def save_mock_mo():
     if faction is not None and faction not in _VALID_MOCK_FACTIONS:
         return jsonify({"status": "error", "message": "Invalid faction"}), 400
     state["session"]["mock_mo_faction"] = faction
-    return jsonify({"status": "ok"})
-
-
-@app.route("/save_limit", methods=["POST"])
-def save_limit():
-    data = request.get_json()
-    faction = data.get("faction")
-    limited = data.get("limited")
-    if not faction or not isinstance(limited, bool):
-        return jsonify({"status": "error", "message": "Invalid request"}), 400
-    if limited:
-        state["session"]["limits"][faction] = True
-    else:
-        state["session"]["limits"].pop(faction, None)
     return jsonify({"status": "ok"})
 
 

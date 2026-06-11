@@ -407,10 +407,20 @@ def _planet_sort_key(planet, mo_indices, mo_target_faction, has_unknown_task):
     return (0 if in_mo else 1, 0 if is_target else 1, -planet["player_count"])
 
 
-def _build_theaters(parsed_data):
+def _hidden_planet_indices(flavor_texts):
+    """Planet indices the user has toggled OFF via the per-planet show/hide control.
+    Stored as planet_visibility = {str(index): bool}, default-shown; hidden = value is False."""
+    vis = flavor_texts.get("planet_visibility", {})
+    return {int(idx) for idx, shown in vis.items() if not shown}
+
+
+def _build_theaters(parsed_data, hidden_indices=None):
     """Groups planets by enemy faction. Theater order = first appearance in parsed_data['planets'].
 
     Within each theater, planets are sorted: MO planets first, then non-MO, both by player count desc.
+    Pass hidden_indices (a set of planet indices) to drop user-hidden planets up front — done
+    here, before any limit/balance, so a hidden planet frees its slot rather than consuming it.
+    A faction whose planets are all hidden simply never appears (empty front auto-dropped).
     Returns (theater_order list, theaters dict).
     """
     orders = parsed_data.get("orders", [])
@@ -422,11 +432,14 @@ def _build_theaters(parsed_data):
         for t in order.get("tasks", [])
     )
 
+    hidden_indices = hidden_indices or set()
     theater_order = []
     theaters = {}
     for planet in parsed_data["planets"]:
         if planet.get("gambit_added"):
             continue  # display attachment only — added by gambit closure, not the limit
+        if planet["index"] in hidden_indices:
+            continue  # per-planet hide — dropped before limit/balance so it frees a slot
         faction = _enemy_faction(planet)
         if faction not in theaters:
             theaters[faction] = []
@@ -872,16 +885,11 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
     dss = parsed_data.get("dss")
     dss_planet_index = dss["planet_index"] if dss else None
 
-    theater_order, theaters = _build_theaters(parsed_data)
-    limits = flavor_texts.get("limits", {})
+    theater_order, theaters = _build_theaters(parsed_data, _hidden_planet_indices(flavor_texts))
     excluded = set(flavor_texts.get("excluded_theaters", []))
     global_limit = int(flavor_texts.get("global_planet_limit") or 0)
     if global_limit > 0:
         theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
-    else:
-        for faction in theater_order:
-            if limits.get(faction):
-                theaters[faction] = theaters[faction][:1]
     theater_order = [f for f in theater_order if f not in excluded]
 
     lines = []
@@ -1127,16 +1135,11 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
     dss = parsed_data.get("dss")
     dss_planet_index = dss["planet_index"] if dss else None
 
-    theater_order, theaters = _build_theaters(parsed_data)
-    limits = flavor_texts.get("limits", {})
+    theater_order, theaters = _build_theaters(parsed_data, _hidden_planet_indices(flavor_texts))
     excluded = set(flavor_texts.get("excluded_theaters", []))
     global_limit = int(flavor_texts.get("global_planet_limit") or 0)
     if global_limit > 0:
         theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
-    else:
-        for faction in theater_order:
-            if limits.get(faction):
-                theaters[faction] = theaters[faction][:1]
     theater_order = [f for f in theater_order if f not in excluded]
 
     lines = []
@@ -1292,19 +1295,20 @@ def _dss_action_timing(action):
     return None
 
 
-def get_theater_data(parsed_data, limits=None, classifications=None, planet_modifiers=None):
+def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
+                     planet_visibility=None):
     """Returns structured theater data for the flavor editor reference panels.
 
     Pre-formats all durations and task labels so the JS template has no calculation to do.
     Returns a list of theater dicts, one per faction, in display order.
+
+    Every planet is returned (no hide-filtering here) and tagged with its `visible` state so
+    the editor can render a per-planet show/hide toggle, including for hidden planets.
     """
-    limits = limits or {}
     classifications = classifications or {}
     planet_modifiers = planet_modifiers or {}
+    planet_visibility = planet_visibility or {}
     theater_order, theaters = _build_theaters(parsed_data)
-    for faction in theater_order:
-        if limits.get(faction):
-            theaters[faction] = theaters[faction][:1]
     orders = parsed_data.get("orders", [])
     dss = parsed_data.get("dss")
     mo_indices = _get_mo_planet_indices(parsed_data)
@@ -1353,6 +1357,8 @@ def get_theater_data(parsed_data, limits=None, classifications=None, planet_modi
                     "status": _format_region_status(r),
                 })
             planet_refs.append({
+                "index": p["index"],
+                "visible": planet_visibility.get(str(p["index"]), True),
                 "name": p["name"],
                 "player_count": f"{p['player_count']:,}",
                 "progress_pct": p["progress_pct"],
@@ -1469,12 +1475,8 @@ def get_modifier_panel_data(parsed_data, flavor):
     and passes through custom_modifiers with the active planet list.
     """
     planet_modifiers = flavor.get("planet_modifiers", {})
-    limits = flavor.get("limits", {})
 
     theater_order, theaters = _build_theaters(parsed_data)
-    for faction in theater_order:
-        if limits.get(faction):
-            theaters[faction] = theaters[faction][:1]
 
     # Ordered list of active planets with their enemy faction
     active_planets = []
