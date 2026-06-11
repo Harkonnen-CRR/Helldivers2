@@ -2404,7 +2404,7 @@
             <label class="planet-show-toggle"><input type="checkbox" class="planet-visible-cb" ${p.visible === false ? '' : 'checked'} onchange="savePlanetVisibility(${p.index}, this.checked)"> Show</label>
           </div>
           <div class="ref-planet-stat"><strong>${p.player_count.toLocaleString()} players</strong> &nbsp;|&nbsp; ${p.is_defense ? 'Defense' : 'Liberation'}: <strong>${p.progress_pct}%</strong> &nbsp;|&nbsp; ${escHtml(p.time_status)}</div>
-          ${p.biome ? `<div class="ref-planet-stat">Biome: <strong>${escHtml(p.biome)}</strong></div>` : ''}
+          ${(p.sector || p.biome) ? `<div class="ref-planet-stat">${p.sector ? `Sector: <strong>${escHtml(p.sector)}</strong>` : ''}${p.sector && p.biome ? ' &nbsp;|&nbsp; ' : ''}${p.biome ? `Biome: <strong>${escHtml(p.biome)}</strong>` : ''}</div>` : ''}
           ${p.biome_description ? `<div class="ref-planet-hazards">${escHtml(p.biome_description)}</div>` : ''}
           ${hazardLines}
           ${regionLines ? `<div class="planet-notes-label">Population Centers</div>${regionLines}` : ''}
