@@ -700,11 +700,51 @@ def _section_orders_discord(parsed_data, flavor_texts):
     return lines
 
 
+def _special_event_active(event, parsed_data):
+    """A special event renders iff it is enabled, not past its expiry, and — if linked
+    to an order — that order is still in the current feed (so it auto-hides the moment
+    the Strategic Threat completes or disappears). Expiry and order-link are independent
+    gates: set either, both, or neither."""
+    if not event.get("enabled", True):
+        return False
+    expires = event.get("expires")
+    if expires:
+        remaining = _time_remaining_hours(expires)
+        if remaining is not None and remaining <= 0:
+            return False
+    linked = event.get("linked_order_id")
+    if linked:
+        order_ids = {str(o.get("id")) for o in parsed_data.get("orders", [])}
+        if str(linked) not in order_ids:
+            return False
+    return True
+
+
+def _active_special_events(flavor_texts, parsed_data, scope):
+    """Active special events for a given scope ('all' or 'planets'), in order, skipping
+    empty bundles (no name and no non-blank lines)."""
+    out = []
+    for e in (flavor_texts.get("special_events") or []):
+        if e.get("scope", "all") != scope:
+            continue
+        has_content = e.get("name", "").strip() or any((l or "").strip() for l in (e.get("lines") or []))
+        if has_content and _special_event_active(e, parsed_data):
+            out.append(e)
+    return out
+
+
 def _section_fleetwide_discord(parsed_data, flavor_texts):
     free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
-    if not free_stratagems:
+    events = _active_special_events(flavor_texts, parsed_data, "all")
+    if not (free_stratagems or events):
         return []
-    lines = ["**FLEETWIDE EQUIPMENT**"]
+    lines = ["**FLEETWIDE STATUS**"]
+    for e in events:
+        if e.get("name", "").strip():
+            lines.append(f"> **{e['name'].strip()}**")
+        for ln in (e.get("lines") or []):
+            if ln.strip():
+                lines.append(f">   • {ln.strip()}")
     for s in free_stratagems:
         planets = s.get("planets") or []
         planet_str = ", ".join(planets) if planets else "All active fronts"
@@ -734,6 +774,7 @@ def _section_intel_discord(parsed_data, flavor_texts):
 
 
 def _section_planets_discord(parsed_data, classifications, flavor_texts):
+    special_planet_events = _active_special_events(flavor_texts, parsed_data, "planets")
     theater_flavors = flavor_texts.get("theaters", {})
     planet_flavors = flavor_texts.get("planets", {})
     dss = parsed_data.get("dss")
@@ -842,6 +883,14 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
                     pre, suf = _TIER_DISCORD.get(cm.get("tier", "none"), ("", ""))
                     lines.append(f"> {pre}{cm['text'].strip()}{suf}")
 
+            for e in special_planet_events:
+                if planet["name"] in (e.get("planets") or []):
+                    if e.get("name", "").strip():
+                        lines.append(f"> **{e['name'].strip()}**")
+                    for ln in (e.get("lines") or []):
+                        if ln.strip():
+                            lines.append(f">   • {ln.strip()}")
+
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
                 lines.append("")
@@ -929,9 +978,16 @@ def _section_orders_video(parsed_data, flavor_texts):
 
 def _section_fleetwide_video(parsed_data, flavor_texts):
     free_stratagems = [s for s in (flavor_texts.get("free_stratagems") or []) if s.get("name", "").strip()]
-    if not free_stratagems:
+    events = _active_special_events(flavor_texts, parsed_data, "all")
+    if not (free_stratagems or events):
         return []
-    lines = [MAJOR_SEP, "FLEETWIDE EQUIPMENT", MAJOR_SEP]
+    lines = [MAJOR_SEP, "FLEETWIDE STATUS", MAJOR_SEP]
+    for e in events:
+        if e.get("name", "").strip():
+            lines.append(f"  {e['name'].strip().upper()}")
+        for ln in (e.get("lines") or []):
+            if ln.strip():
+                lines.append(f"    {ln.strip()}")
     for s in free_stratagems:
         planets = s.get("planets") or []
         planet_str = ", ".join(planets) if planets else "All active fronts"
@@ -960,6 +1016,7 @@ def _section_intel_video(parsed_data, flavor_texts):
 
 
 def _section_planets_video(parsed_data, classifications, flavor_texts):
+    special_planet_events = _active_special_events(flavor_texts, parsed_data, "planets")
     theater_flavors = flavor_texts.get("theaters", {})
     planet_flavors = flavor_texts.get("planets", {})
     dss = parsed_data.get("dss")
@@ -1050,6 +1107,14 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
                 if planet["name"] in cm.get("planets", []) and cm.get("text", "").strip():
                     transform = _TIER_VIDEO_TRANSFORM.get(cm.get("tier", "none"), str.title)
                     lines.append(f"    {transform(cm['text'].strip())}")
+
+            for e in special_planet_events:
+                if planet["name"] in (e.get("planets") or []):
+                    if e.get("name", "").strip():
+                        lines.append(f"    {e['name'].strip().upper()}")
+                    for ln in (e.get("lines") or []):
+                        if ln.strip():
+                            lines.append(f"      {ln.strip()}")
 
             active_regions = [r for r in planet.get("regions", []) if r.get("players", 0) > 0 and r["health"] < r["max_health"]]
             if active_regions:
