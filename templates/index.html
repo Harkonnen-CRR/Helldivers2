@@ -238,6 +238,31 @@
       content: ' (hidden)'; font-size: 10px; color: #888; font-weight: normal; letter-spacing: 0;
     }
 
+    /* Wiki lore (Layer B) — collapsible reference under each planet card */
+    .ref-lore-toggle {
+      margin-top: 8px; font-size: 11px; color: #9a8a6a; cursor: pointer; user-select: none;
+      font-weight: bold; letter-spacing: 0.3px;
+    }
+    .ref-lore-toggle:hover { color: #c0a870; }
+    .ref-lore-caret { display: inline-block; width: 10px; color: #7a6a4a; }
+    .ref-lore-hint { color: #666; font-weight: normal; font-size: 10px; }
+    .ref-lore { display: none; margin-top: 6px; max-height: 320px; overflow-y: auto; }
+    .ref-lore.open { display: block; }
+    .ref-lore-msg { font-size: 11px; color: #888; padding: 4px 2px; font-style: italic; }
+    .lore-entry {
+      border-left: 2px solid #3a3320; background: #0e0c06; border-radius: 3px;
+      padding: 5px 7px; margin-bottom: 5px;
+    }
+    .lore-entry-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+    .lore-entry-title { font-size: 11px; font-weight: bold; color: #d8c890; flex: 1; }
+    .lore-entry-cat { font-size: 9px; color: #6a6a5a; text-transform: uppercase; white-space: nowrap; }
+    .lore-insert-btn {
+      font-size: 10px; background: #2a2410; color: #d8c890; border: 1px solid #4a4020;
+      border-radius: 3px; padding: 2px 7px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    }
+    .lore-insert-btn:hover { background: #3a3018; border-color: #6a5a30; }
+    .lore-entry-text { font-size: 11px; color: #9a9a8a; line-height: 1.4; white-space: pre-wrap; }
+
     .ref-planet-stat { color: #7a9a7a; font-size: 11px; margin-bottom: 2px; }
     .ref-planet.terminid  .ref-planet-stat { color: #8a8050; }
     .ref-planet.automaton .ref-planet-stat { color: #8a6060; }
@@ -1421,6 +1446,67 @@
     scheduleReformat();
   }
 
+  // ── Wiki lore (Layer B) — on-demand reference, never auto-inserted ──────────
+  async function togglePlanetLore(index, toggleEl) {
+    const box = toggleEl.parentElement.querySelector(`.ref-lore[data-planet-index="${index}"]`);
+    const caret = toggleEl.querySelector('.ref-lore-caret');
+    const open = box.classList.toggle('open');
+    caret.textContent = open ? '▾' : '▸';
+    if (!open || box.dataset.loaded === '1') return;
+    box.dataset.loaded = '1';
+    box.innerHTML = '<div class="ref-lore-msg">Loading wiki lore…</div>';
+    try {
+      const res = await fetch('/planet_lore', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') {
+        box.innerHTML = `<div class="ref-lore-msg">${escHtml(data.message || 'Could not load lore.')}</div>`;
+        box.dataset.loaded = '0';
+        return;
+      }
+      if (!data.entries || !data.entries.length) {
+        box.innerHTML = '<div class="ref-lore-msg">No wiki lore page for this planet.</div>';
+        return;
+      }
+      const planetName = box.dataset.planetName;
+      box.innerHTML = data.entries.map(e => loreEntryHTML(planetName, e)).join('');
+    } catch (err) {
+      box.innerHTML = '<div class="ref-lore-msg">Couldn\'t reach the wiki — try again.</div>';
+      box.dataset.loaded = '0';
+    }
+  }
+
+  function loreEntryHTML(planetName, e) {
+    const tag = e.parent ? `${e.category} · ${e.parent}` : e.category;
+    return `<div class="lore-entry">
+      <div class="lore-entry-head">
+        <span class="lore-entry-title">${escHtml(e.title)}</span>
+        <span class="lore-entry-cat">${escHtml(tag)}</span>
+        <button class="lore-insert-btn" onclick='insertLoreIntoFlavor(${JSON.stringify(planetName)}, this)'>→ Insert</button>
+      </div>
+      <div class="lore-entry-text">${escHtml(e.text)}</div>
+    </div>`;
+  }
+
+  // Append a lore entry's text into the planet's flavor box (the explicit opt-in: this is
+  // the only way wiki text reaches the output, and it lands as editable starting text).
+  function insertLoreIntoFlavor(planetName, btn) {
+    const text = btn.closest('.lore-entry').querySelector('.lore-entry-text').innerText.trim();
+    const ta = document.querySelector(`.planet-flavor-text[data-key="${CSS.escape(planetName)}"]`);
+    if (!ta) return;
+    ta.value = ta.value.trim() ? (ta.value.trimEnd() + '\n\n' + text) : text;
+    ta.classList.add('visible');                 // reveal the box
+    const item = ta.closest('.planet-flavor-item');
+    const cb = item && item.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = true;                    // mark it active (matches has-text state)
+    saveFlavor('planets', planetName, ta.value);
+    scheduleReformat();
+    btn.textContent = '✓ Inserted';
+    setTimeout(() => { btn.textContent = '→ Insert'; }, 1200);
+  }
+
   function addManualOrder() {
     const list = document.getElementById('orders-list');
     const empty = list.querySelector('.no-hazards');
@@ -2410,6 +2496,10 @@
           ${regionLines ? `<div class="planet-notes-label">Population Centers</div>${regionLines}` : ''}
           <div class="planet-notes-label">Notes</div>
           <textarea class="planet-notes-input" data-scope="planet_notes" data-key="${escHtml(p.name)}">${escHtml(savedNote)}</textarea>
+          <div class="ref-lore-toggle" onclick="togglePlanetLore(${p.index}, this)">
+            <span class="ref-lore-caret">▸</span> 📖 Wiki Lore <span class="ref-lore-hint">(reference)</span>
+          </div>
+          <div class="ref-lore" data-planet-index="${p.index}" data-planet-name="${escHtml(p.name)}" data-loaded="0"></div>
         </div>`;
     }
 
