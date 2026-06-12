@@ -1470,6 +1470,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
         if dss_in_theater:
             ftl = format_duration(_time_remaining_hours(dss["election_end"])) if dss.get("election_end") else None
             dss_ref = {
+                "planet_index": dss["planet_index"],
                 "planet_name": dss["planet_name"],
                 "ftl_jump": ftl,
                 "actions": [

@@ -2653,6 +2653,17 @@
     pinnedPlanets = pinnedPlanets || [];
     const factionClass = { Terminids: 'terminid', Automaton: 'automaton', Illuminate: 'illuminate', Humans: 'humans' }[theater.faction] || '';
 
+    // DSS reference block — rendered UNDER its orbiting planet's card (not the theater bottom).
+    const dss = theater.dss;
+    const dssBlock = dss ? `<div class="ref-dss">
+        <div class="ref-dss-label">⊙ DSS in Orbit${dss.ftl_jump ? ` — ${escHtml(dss.ftl_jump)} until FTL jump` : ''}</div>
+        ${dss.actions.map(a => {
+          const cost = a.cost_label ? ` (${escHtml(a.cost_label)})` : '';
+          const desc = a.description ? `<div class="ref-dss-action-desc">│ ${escHtml(a.description)}</div>` : '';
+          return `<div class="ref-dss-action ${escHtml(a.status)}"><strong>${escHtml(a.name)}</strong>${cost} — ${escHtml(a.phrase)}</div>${desc}`;
+        }).join('')}
+      </div>` : '';
+
     for (const p of theater.planets) {
       const hazardLines = p.hazards.map(h =>
         `<div class="ref-planet-hazards">⚠ ${escHtml(h.name)}${h.description ? ' — <em>' + escHtml(h.description) + '</em>' : ''}</div>`
@@ -2688,37 +2699,12 @@
             <span class="ref-lore-caret">▸</span> 📖 Wiki Lore <span class="ref-lore-hint">(reference)</span>
           </div>
           <div class="ref-lore" data-planet-index="${p.index}" data-planet-name="${escHtml(p.name)}" data-loaded="0"></div>
+          ${(dss && dss.planet_index === p.index) ? dssBlock : ''}
         </div>`;
     }
 
-    if (theater.mo) {
-      const mo = theater.mo;
-      const tasks = mo.tasks.map(t => `<div class="ref-mo-task">• ${escHtml(t)}</div>`).join('');
-      html += `
-        <div class="ref-mo">
-          <div class="ref-mo-label">MAJOR ORDER</div>
-          <div class="ref-mo-text">${escHtml(mo.briefing)}</div>
-          ${tasks}
-          <div class="ref-mo-text">Reward: ${escHtml(mo.reward)} | Expires: ${escHtml(mo.expires)}</div>
-        </div>`;
-    }
-
-    if (theater.dss) {
-      const dss = theater.dss;
-      const actions = dss.actions.map(a => {
-        const cost = a.cost_label ? ` (${escHtml(a.cost_label)})` : '';
-        const desc = a.description
-          ? `<div class="ref-dss-action-desc">│ ${escHtml(a.description)}</div>`
-          : '';
-        return `<div class="ref-dss-action ${escHtml(a.status)}"><strong>${escHtml(a.name)}</strong>${cost} — ${escHtml(a.phrase)}</div>${desc}`;
-      }).join('');
-      html += `
-        <div class="ref-dss">
-          <div class="ref-dss-label">DSS — ${escHtml(dss.planet_name)}${dss.ftl_jump ? ` (${escHtml(dss.ftl_jump)} until FTL jump)` : ''}</div>
-          ${actions}
-        </div>`;
-    }
-
+    // MO is shown in the top Orders panel (its own section), and the DSS rides under its
+    // orbiting planet above — neither is attached at the theater bottom anymore.
     return html;
   }
 
