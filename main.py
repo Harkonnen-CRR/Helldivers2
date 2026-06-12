@@ -9,7 +9,7 @@ from flask import Flask, jsonify, render_template, request
 import wiki_lore
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all, build_planet_by_index, list_all_planets, top_populated_indices
-from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, get_dss_ref, SECTION_KEYS
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, get_dss_ref, _detected_equipment, SECTION_KEYS
 
 app = Flask(__name__)
 
@@ -271,6 +271,7 @@ def _board_response():
         "status": "ok",
         "theaters": theaters,
         "dss": get_dss_ref(pp),
+        "detected_equipment": _detected_equipment(pp),
         "discord": format_discord(pp, state["classifications"], merged),
         "video": format_video(pp, state["classifications"], merged),
         "flavor": merged,
@@ -354,6 +355,7 @@ def refresh():
         "items": items_with_state,
         "theaters": theaters,
         "dss": get_dss_ref(parsed),
+        "detected_equipment": _detected_equipment(parsed),
         "modifier_panel": modifier_panel,
         "effects_panel": get_effects_panel_data(parsed, merged),
         "dispatches": parsed.get("dispatches", []),
@@ -429,6 +431,7 @@ def fetch2():
         "video": video_text,
         "theaters": theaters,
         "dss": get_dss_ref(parsed),
+        "detected_equipment": _detected_equipment(parsed),
         "modifier_panel": modifier_panel,
         "effects_panel": get_effects_panel_data(parsed, merged),
         "dispatches": parsed.get("dispatches", []),

@@ -888,9 +888,28 @@ def _active_special_events(flavor_texts, parsed_data, scope):
     return out
 
 
+def _detected_equipment(parsed_data):
+    """Fleetwide equipment grants AUTO-DETECTED from live galactic effects named
+    'ARSENAL AUGMENTATION: <equipment>'. Reliable structured names; the effect's presence IS
+    the timer (auto-appears when granted, auto-vanishes when it ends — no expiry to track).
+    Returns [{name, detected: True}], deduped, in stable order."""
+    seen = {}
+    for effs in (parsed_data.get("all_effects_by_index") or {}).values():
+        for e in effs:
+            name = (e.get("name") or "")
+            if name.upper().startswith("ARSENAL AUGMENTATION:"):
+                equip = name.split(":", 1)[1].strip()
+                if equip:
+                    seen.setdefault(equip.upper(), {"name": equip, "detected": True})
+    return list(seen.values())
+
+
 def _active_equipment(flavor_texts, parsed_data, scope):
-    """Active fleetwide-equipment items for a scope ('all'|'planets'), in order."""
+    """Active fleetwide-equipment items for a scope ('all'|'planets'), in order. For the
+    fleetwide ('all') scope, live AUTO-DETECTED ARSENAL AUGMENTATION grants are merged in,
+    deduped against manual entries (manual takes precedence on a name clash)."""
     out = []
+    manual_names = set()
     for s in (flavor_texts.get("free_stratagems") or []):
         if not (s.get("name") or "").strip():
             continue
@@ -898,6 +917,11 @@ def _active_equipment(flavor_texts, parsed_data, scope):
             continue
         if _timed_item_active(s, parsed_data):
             out.append(s)
+            manual_names.add(s["name"].strip().upper())
+    if scope == "all":
+        for d in _detected_equipment(parsed_data):
+            if d["name"].upper() not in manual_names:
+                out.append(d)
     return out
 
 
