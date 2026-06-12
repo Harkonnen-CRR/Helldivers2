@@ -292,31 +292,43 @@ def _current_board_order():
     return factions, planets
 
 
+def _cache_updated_str():
+    """Human-readable last-modified time of the cached planet data, for the offline banner."""
+    try:
+        return datetime.fromtimestamp(os.path.getmtime("data/planets.json")).strftime("%Y-%m-%d %H:%M")
+    except OSError:
+        return "unknown"
+
+
 @app.route("/refresh", methods=["POST"])
 def refresh():
+    stale = False
     try:
         fetch_all()
-    except ApiError as e:
-        return jsonify({"status": "error", "message": str(e), "error_type": _api_error_type(e.status_code)}), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e), "error_type": "unknown"}), 200
-
-    state["snapshot1_time"] = datetime.now()
+        # Live API unreachable — serve the LAST CACHED data/*.json if we have any, so the board
+        # stays usable offline (flagged stale; live liberation rates unavailable until recovery).
+        if not os.path.exists("data/planets.json"):
+            etype = _api_error_type(e.status_code) if isinstance(e, ApiError) else "unknown"
+            return jsonify({"status": "error", "message": str(e), "error_type": etype}), 200
+        stale = True
 
     with open("data/planets.json") as f:
         raw_planets = json.load(f)
 
-    snapshot1_health = {}
-    for p in raw_planets:
-        idx = p["index"]
-        event = p.get("event")
-        if event and event.get("eventType") == 1:
-            snapshot1_health[idx] = event["health"]
-        else:
-            snapshot1_health[idx] = p["health"]
-        for r in p.get("regions", []):
-            snapshot1_health[f"{idx}_r{r['id']}"] = r["health"]
-    state["snapshot1_health"] = snapshot1_health
+    if not stale:
+        state["snapshot1_time"] = datetime.now()
+        snapshot1_health = {}
+        for p in raw_planets:
+            idx = p["index"]
+            event = p.get("event")
+            if event and event.get("eventType") == 1:
+                snapshot1_health[idx] = event["health"]
+            else:
+                snapshot1_health[idx] = p["health"]
+            for r in p.get("regions", []):
+                snapshot1_health[f"{idx}_r{r['id']}"] = r["health"]
+        state["snapshot1_health"] = snapshot1_health
 
     parsed = _inject_mock_order(parse_all())
     items = _get_classification_items(raw_planets)
@@ -335,7 +347,7 @@ def refresh():
     theaters = get_theater_data(_apply_board(parsed), state["classifications"], merged.get("planet_modifiers", {}), planet_visibility=merged.get("planet_visibility", {}), theater_seq=merged.get("theater_order"), planet_seq=merged.get("planet_order"))
     modifier_panel = get_modifier_panel_data(parsed, merged)
 
-    return jsonify({
+    resp = {
         "status": "ok",
         "items": items_with_state,
         "theaters": theaters,
@@ -345,7 +357,17 @@ def refresh():
         "orders": parsed.get("orders", []),
         "all_planets": list_all_planets(),
         "flavor": merged,
-    })
+    }
+    if stale:
+        # Offline: serve the output now (no live liberation rates) and set last_parsed so
+        # reformat/board ops work. The client skips the two-snapshot lib-rate flow.
+        state["last_parsed"] = parsed
+        pp = _apply_board(parsed)
+        resp["stale"] = True
+        resp["last_updated"] = _cache_updated_str()
+        resp["discord"] = format_discord(pp, state["classifications"], merged)
+        resp["video"] = format_video(pp, state["classifications"], merged)
+    return jsonify(resp)
 
 
 @app.route("/fetch2", methods=["POST"])
