@@ -696,6 +696,42 @@ def _format_dss_video(dss):
     return lines
 
 
+def _dss_attached_discord(dss):
+    """Full DSS detail rendered UNDER its orbiting planet's block (Discord quote style)."""
+    lines = ["> **⊙ DSS IN ORBIT**"]
+    if dss.get("election_end"):
+        hrs = _time_remaining_hours(dss["election_end"])
+        if hrs and hrs > 0:
+            lines.append(f"> *{format_duration(hrs)} until FTL jump*")
+    for action in dss["tactical_actions"]:
+        cost = _dss_cost_label(action)
+        cost_str = f" ({cost})" if cost else ""
+        phrase = _dss_status_phrase(action)
+        lines.append(f"> **{action['name']}**{cost_str} — {phrase}")
+        desc = _strip_html(action["strategic_description"])
+        if desc:
+            lines.append(f"> │ *{desc}*")
+    return lines
+
+
+def _dss_attached_video(dss):
+    """Full DSS detail rendered UNDER its orbiting planet's block (plain-text/indented)."""
+    lines = ["    ⊙ DSS IN ORBIT"]
+    if dss.get("election_end"):
+        hrs = _time_remaining_hours(dss["election_end"])
+        if hrs and hrs > 0:
+            lines.append(f"    {format_duration(hrs)} until FTL jump")
+    for action in dss["tactical_actions"]:
+        cost = _dss_cost_label(action)
+        cost_str = f" ({cost})" if cost else ""
+        phrase = _dss_status_phrase(action)
+        lines.append(f"    {action['name']}{cost_str} — {phrase}")
+        desc = _strip_html(action["strategic_description"])
+        if desc:
+            lines.append(f"      {desc}")
+    return lines
+
+
 MAJOR_SEP = "================================================"
 MINOR_SEP = "------------------------------------------------"
 
@@ -966,19 +1002,7 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
             lines.append("__**Planetary Details and Modifiers**__")
 
             if on_dss and dss:
-                lines.append("> **DSS in Orbit**")
-                for action in dss["tactical_actions"]:
-                    if action["status_label"] == "active":
-                        expire = action.get("status_expire")
-                        duration_str = ""
-                        if expire:
-                            hrs = _time_remaining_hours(expire)
-                            if hrs and hrs > 0:
-                                duration_str = f" — Active for {format_duration(hrs)}"
-                        lines.append(f"> **{action['name']}**{duration_str}")
-                        desc = _strip_html(action["strategic_description"])
-                        if desc:
-                            lines.append(f"> │ *{desc}*")
+                lines.extend(_dss_attached_discord(dss))
 
             lines.append(f"> Sector: {planet['sector']} | Biome: **{planet['biome']}**")
             hp_max = planet.get("contest_max_health", 0)
@@ -1046,9 +1070,25 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
     return lines
 
 
-def _section_dss_discord(parsed_data):
+def _displayed_planet_indices(parsed_data, flavor_texts):
+    """The set of planet indices the Planet Report actually renders (after hide + 3-front
+    balance/limit + exclude; board pins/removes are already baked into parsed['planets'])."""
+    theater_order, theaters = _build_theaters(parsed_data, _hidden_planet_indices(flavor_texts))
+    excluded = set(flavor_texts.get("excluded_theaters", []))
+    global_limit = int(flavor_texts.get("global_planet_limit") or 0)
+    if global_limit > 0:
+        theater_order, theaters = _balance_theaters(theater_order, theaters, parsed_data, global_limit, excluded)
+    theater_order = [f for f in theater_order if f not in excluded]
+    return {p["index"] for f in theater_order for p in theaters[f]}
+
+
+def _section_dss_discord(parsed_data, flavor_texts):
     dss = parsed_data.get("dss")
     if not dss:
+        return []
+    # When the DSS's planet is on the board, the DSS is shown attached to it — skip the
+    # standalone block. Only render here as a fallback when that planet isn't displayed.
+    if dss.get("planet_index") in _displayed_planet_indices(parsed_data, flavor_texts):
         return []
     return ["", *_format_dss_discord(dss)]
 
@@ -1071,7 +1111,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None, sections=Non
         "fleetwide": lambda: _section_fleetwide_discord(parsed_data, flavor_texts),
         "intel":     lambda: _section_intel_discord(parsed_data, flavor_texts),
         "planets":   lambda: _section_planets_discord(parsed_data, classifications, flavor_texts),
-        "dss":       lambda: _section_dss_discord(parsed_data),
+        "dss":       lambda: _section_dss_discord(parsed_data, flavor_texts),
     }
     lines = [f"**Galactic War Update: {_build_sest_stamp()}**", ""]
     for key in _ordered_sections(flavor_texts):
@@ -1198,6 +1238,9 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
             lines.append(f"{planet['name'].upper()}{dss_tag}")
             lines.append(MINOR_SEP)
 
+            if on_dss and dss:
+                lines.extend(_dss_attached_video(dss))
+
             planet_text = planet_flavors.get(planet["name"])
             if planet_text:
                 lines.append(f"    {planet_text}")
@@ -1279,10 +1322,12 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
     return lines
 
 
-def _section_dss_video(parsed_data):
+def _section_dss_video(parsed_data, flavor_texts):
     dss = parsed_data.get("dss")
     if not dss:
         return []
+    if dss.get("planet_index") in _displayed_planet_indices(parsed_data, flavor_texts):
+        return []  # shown attached to its planet
     return [MAJOR_SEP, *_format_dss_video(dss)]
 
 
@@ -1305,7 +1350,7 @@ def format_video(parsed_data, classifications, flavor_texts=None, sections=None)
         "fleetwide": lambda: _section_fleetwide_video(parsed_data, flavor_texts),
         "intel":     lambda: _section_intel_video(parsed_data, flavor_texts),
         "planets":   lambda: _section_planets_video(parsed_data, classifications, flavor_texts),
-        "dss":       lambda: _section_dss_video(parsed_data),
+        "dss":       lambda: _section_dss_video(parsed_data, flavor_texts),
     }
     for key in _ordered_sections(flavor_texts):
         if key in sections:
