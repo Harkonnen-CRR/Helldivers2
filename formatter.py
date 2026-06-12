@@ -1375,6 +1375,26 @@ def _dss_action_timing(action):
     return None
 
 
+def get_dss_ref(parsed_data):
+    """The DSS reference block (orbiting planet + tactical actions), or None — independent of
+    which planets are displayed, so the editor can attach it to its planet's card when shown OR
+    fall back to a standalone DSS panel when that planet is off the board."""
+    dss = parsed_data.get("dss")
+    if not dss:
+        return None
+    ftl = format_duration(_time_remaining_hours(dss["election_end"])) if dss.get("election_end") else None
+    return {
+        "planet_index": dss["planet_index"],
+        "planet_name": dss["planet_name"],
+        "ftl_jump": ftl,
+        "actions": [
+            {"name": a["name"], "status": a["status_label"], "cost_label": _dss_cost_label(a),
+             "phrase": _dss_status_phrase(a), "description": _strip_html(a["strategic_description"])}
+            for a in dss["tactical_actions"]
+        ],
+    }
+
+
 def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
                      planet_visibility=None, theater_seq=None, planet_seq=None):
     """Returns structured theater data for the flavor editor reference panels.
@@ -1466,24 +1486,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
                 "tasks": mo_task_labels,
             }
 
-        dss_ref = None
-        if dss_in_theater:
-            ftl = format_duration(_time_remaining_hours(dss["election_end"])) if dss.get("election_end") else None
-            dss_ref = {
-                "planet_index": dss["planet_index"],
-                "planet_name": dss["planet_name"],
-                "ftl_jump": ftl,
-                "actions": [
-                    {
-                        "name": a["name"],
-                        "status": a["status_label"],
-                        "cost_label": _dss_cost_label(a),
-                        "phrase": _dss_status_phrase(a),
-                        "description": _strip_html(a["strategic_description"]),
-                    }
-                    for a in dss["tactical_actions"]
-                ],
-            }
+        dss_ref = get_dss_ref(parsed_data) if dss_in_theater else None
 
         theater_gambits = []
         for s in gambit_summaries:
