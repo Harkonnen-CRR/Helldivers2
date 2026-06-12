@@ -1043,8 +1043,6 @@
       return;
     }
 
-    stopApiPolling();
-    hideApiDot();
     updateClassificationPanel(data.items);
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildEffectsPanel(data.effects_panel);
@@ -1055,6 +1053,25 @@
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
     buildFlavorEditor(data.theaters, data.flavor);
     populatePlanetSearch(data.all_planets);
+
+    if (data.stale) {
+      // API down — board served from cached data. No live liberation rates; skip the
+      // two-snapshot countdown. Output shown from cache; board editing works normally.
+      if (typeof data.discord === 'string') {
+        document.getElementById('out-discord').value = data.discord;
+        document.getElementById('out-video').value = data.video;
+        updateCharCount();
+        document.getElementById('reformat-btn').style.display = 'inline-block';
+      }
+      startApiPolling();
+      setStatus('⚠ OFFLINE — showing cached data from ' + (data.last_updated || 'last fetch') +
+                '. Live liberation rates unavailable until the API is back; board editing works normally.');
+      document.getElementById('refresh-btn').disabled = false;
+      return;
+    }
+
+    stopApiPolling();
+    hideApiDot();
     startCountdown();
   }
 
