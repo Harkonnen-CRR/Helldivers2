@@ -636,6 +636,12 @@
     .pfe-equip { font-size: 11px; color: #5fc8d8; margin-bottom: 2px; }
     .pfe-equip b { color: #8fe8f8; }
     .flavor-fleetwide-equipment { margin: 4px 0 10px; }
+    .strat-detected {
+      font-size: 12px; color: #b8c0c8; padding: 4px 7px; margin-bottom: 4px;
+      background: #0c1410; border: 1px solid #1e3024; border-radius: 3px;
+    }
+    .strat-detected-tag { font-size: 9px; color: #6ac08a; font-weight: bold; letter-spacing: 0.5px; }
+    .strat-detected-note { font-size: 10px; color: #667; }
     .planet-flavor-equipment { margin-top: 4px; }
 
     /* Orders panel */
@@ -1090,7 +1096,7 @@
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildEffectsPanel(data.effects_panel);
     buildDispatchPanel(data.dispatches || [], data.flavor);
-    buildFreeStratagemsPanel(data.flavor);
+    buildFreeStratagemsPanel(data.flavor, data.detected_equipment);
     buildOrdersPanel(data.orders || [], data.flavor);
     buildSpecialEventsPanel(data.orders || [], data.flavor);
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
@@ -1175,7 +1181,7 @@
     buildModifierPanel(data.modifier_panel, data.flavor);
     buildEffectsPanel(data.effects_panel);
     buildDispatchPanel(data.dispatches || [], data.flavor);
-    buildFreeStratagemsPanel(data.flavor);
+    buildFreeStratagemsPanel(data.flavor, data.detected_equipment);
     buildOrdersPanel(data.orders || [], data.flavor);
     buildSpecialEventsPanel(data.orders || [], data.flavor);
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
@@ -2358,13 +2364,24 @@
 
   // ── Free Stratagems ───────────────────────────────────────────
 
-  function buildFreeStratagemsPanel(flavor) {
+  function buildFreeStratagemsPanel(flavor, detected) {
     const list = document.getElementById('strat-list');
     list.innerHTML = '';
+    detected = detected || [];
     const saved = (flavor && flavor.free_stratagems) || [];
-    if (saved.length === 0) {
+    if (saved.length === 0 && detected.length === 0) {
       list.innerHTML = '<div class="no-hazards" id="strat-empty">No fleetwide equipment — click + Add.</div>';
       return;
+    }
+    // Auto-detected ARSENAL AUGMENTATION grants (live; read-only — they appear in the output
+    // automatically and vanish when the grant ends). Skip any the user also added manually.
+    const savedNames = new Set(saved.map(s => (s.name || '').trim().toUpperCase()));
+    for (const d of detected) {
+      if (savedNames.has((d.name || '').trim().toUpperCase())) continue;
+      const row = document.createElement('div');
+      row.className = 'strat-detected';
+      row.innerHTML = `<span class="strat-detected-tag">● AUTO</span> <strong>${escHtml(d.name)}</strong> <span class="strat-detected-note">— live, from ARSENAL AUGMENTATION</span>`;
+      list.appendChild(row);
     }
     for (const s of saved) {
       list.appendChild(buildStratRow(s));
