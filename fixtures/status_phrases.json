@@ -1,0 +1,32 @@
+{
+  "liberation": [
+    { "min": 0,   "label": "Performing Recon" },
+    { "min": 5,   "label": "Establishing Beachhead" },
+    { "min": 15,  "label": "Beachhead Secured — Expanding" },
+    { "min": 30,  "label": "Pushing Forward Lines" },
+    { "min": 50,  "label": "Major Offensive Underway" },
+    { "min": 70,  "label": "Enemy in Retreat" },
+    { "min": 85,  "label": "Securing Area" },
+    { "min": 100, "label": "Area Secure" }
+  ],
+  "defense": [
+    { "min": 0,   "label": "Invasion Detected — Mobilizing" },
+    { "min": 5,   "label": "Forming Defensive Lines" },
+    { "min": 15,  "label": "Holding the Line" },
+    { "min": 30,  "label": "Repelling Assault" },
+    { "min": 50,  "label": "Counteroffensive Underway" },
+    { "min": 70,  "label": "Enemy Assault Faltering" },
+    { "min": 85,  "label": "Breaking the Siege" },
+    { "min": 100, "label": "Invasion Repelled" }
+  ],
+  "region": [
+    { "min": 0,   "label": "Scouting Approach Routes" },
+    { "min": 5,   "label": "Establishing Foothold" },
+    { "min": 15,  "label": "Breaching Outer Districts" },
+    { "min": 30,  "label": "Block-by-Block Advance" },
+    { "min": 50,  "label": "City Center Contested" },
+    { "min": 70,  "label": "Clearing Holdouts" },
+    { "min": 85,  "label": "Final Sweep" },
+    { "min": 100, "label": "Region Secure" }
+  ]
+}
