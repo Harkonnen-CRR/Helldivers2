@@ -4,6 +4,8 @@ import re
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from status_phrases import get_status_phrase
+
 
 # Super Earth Standard Time = Arrowhead Game Studios' home timezone (Stockholm).
 # The official companion app renders the game's UTC backend in this zone, so we mirror it.
@@ -982,7 +984,13 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
             else:
                 lib_time = planet.get("liberation_time_hours")
                 outcome = f"LIBERATED in {format_duration(lib_time)}" if lib_time is not None else "Establishing a Beachhead"
-            lines.append(f"**{planet['name']}: {outcome}**")
+            pct = planet["progress_pct"]
+            phrase = get_status_phrase("defense" if is_def else "liberation", pct)
+            header = f"{pct}% — {phrase}" if pct is not None else phrase
+            # keep the time/secure outcome only when it adds info beyond the generic phrase
+            if outcome and outcome != "Establishing a Beachhead":
+                header += f" · {outcome}"
+            lines.append(f"**{planet['name']}: {header}**")
 
             planet_text = planet_flavors.get(planet["name"])
             if planet_text:
@@ -1064,7 +1072,8 @@ def _section_planets_discord(parsed_data, classifications, flavor_texts):
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
                     status_str = f"**{status}**" if ("Secured in" in status or "Lost in" in status) else status
-                    lines.append(f"> **{r['name'].upper()}** ({size}{r['players']} Helldivers) — {pct}% cleared | {status_str}")
+                    phrase = get_status_phrase("region", pct)
+                    lines.append(f"> **{r['name'].upper()}** ({size}{r['players']} Helldivers) — {pct}% cleared — {phrase} | {status_str}")
 
             lines.append("")
     return lines
@@ -1269,7 +1278,8 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
             campaign_type_label = _CAMPAIGN_TYPE_MAP.get(planet['campaign_type'], f"Unknown ({planet['campaign_type']})")
             lines.append(f"    Campaign Level: {planet['campaign_level']} | Type: {campaign_type_label}")
             lines.append(f"    Players: {planet['player_count']:,}")
-            lines.append(f"    {progress_label}: {planet['progress_pct']}%")
+            planet_phrase = get_status_phrase("defense" if is_def else "liberation", planet["progress_pct"])
+            lines.append(f"    {progress_label}: {planet['progress_pct']}% — {planet_phrase}")
             if is_def:
                 d_label, d_time = _format_defense_time(planet)
                 if d_label:
@@ -1316,7 +1326,8 @@ def _section_planets_video(parsed_data, classifications, flavor_texts):
                     pct = round((1 - r["health"] / r["max_health"]) * 100, 1) if (r["max_health"] and r["health"] is not None) else 0.0
                     size = f"{r['size']} — " if r.get("size") else ""
                     status = _format_region_status(r)
-                    lines.append(f"      {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared | {status}")
+                    phrase = get_status_phrase("region", pct)
+                    lines.append(f"      {r['name'].upper()} ({size}{r['players']} Helldivers) — {pct}% cleared — {phrase} | {status}")
 
             lines.append("")
     return lines
@@ -1456,6 +1467,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
                     "progress_pct": pct,
                     "is_available": r["is_available"],
                     "status": _format_region_status(r),
+                    "status_phrase": get_status_phrase("region", pct),
                 })
             planet_refs.append({
                 "index": p["index"],
@@ -1463,6 +1475,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
                 "name": p["name"],
                 "player_count": f"{p['player_count']:,}",
                 "progress_pct": p["progress_pct"],
+                "status_phrase": get_status_phrase("defense" if p["is_defense"] else "liberation", p["progress_pct"]),
                 "time_status": time_status,
                 "is_defense": p["is_defense"],
                 "is_mo": p["index"] in mo_indices,
