@@ -9,7 +9,7 @@ from flask import Flask, jsonify, render_template, request
 import wiki_lore
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all, build_planet_by_index, list_all_planets, top_populated_indices
-from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, SECTION_KEYS
 
 app = Flask(__name__)
 
@@ -29,6 +29,7 @@ _SESSION_DEFAULTS = {
     "removed_planets": [],    # [int index] planets the user took off the board (incl. auto-pulled)
     "theater_order": [],      # [faction] manual front order (board reorder); unset = default
     "planet_order": [],       # [int index] manual planet order within fronts (board reorder)
+    "section_order": [],      # [section_key] manual OUTPUT section order; unset = default
     "global_planet_limit": 5, # max planets shown across all theaters, 0 = no limit
     "manual_orders": [],      # [{title: str}] for header-only manual entries
     "mock_mo_faction": None,  # "Terminids"|"Automaton"|"Illuminate"|None
@@ -642,6 +643,26 @@ def move_theater():
         if 0 <= j < len(factions):
             factions[i], factions[j] = factions[j], factions[i]
     state["session"]["theater_order"] = factions
+    return jsonify(_board_response())
+
+
+@app.route("/move_section", methods=["POST"])
+def move_section():
+    """Re-typeset the broadcast: move a whole OUTPUT section (orders/fleetwide/intel/planets/
+    dss) up/down (dir = -1 up, +1 down). Reflected in the Discord/video output."""
+    data = request.get_json()
+    key = data.get("key")
+    direction = data.get("dir")
+    if key not in SECTION_KEYS or direction not in (-1, 1):
+        return jsonify({"status": "error", "message": "Need a valid section key and dir ±1"}), 400
+    # normalize current order to the full section set
+    current = [k for k in (state["session"].get("section_order") or []) if k in SECTION_KEYS]
+    current += [k for k in SECTION_KEYS if k not in current]
+    i = current.index(key)
+    j = i + direction
+    if 0 <= j < len(current):
+        current[i], current[j] = current[j], current[i]
+    state["session"]["section_order"] = current
     return jsonify(_board_response())
 
 

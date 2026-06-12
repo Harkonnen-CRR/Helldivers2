@@ -718,6 +718,15 @@ def get_output_sections():
     return [{"key": k, "label": SECTION_LABELS[k]} for k in SECTION_KEYS]
 
 
+def _ordered_sections(flavor_texts):
+    """SECTION_KEYS reordered by the user's on-the-fly section_order (stable; unlisted keys
+    keep their default position). Lets the whole broadcast be re-typeset — sections moved
+    up/down — and the output reflects it."""
+    seq = (flavor_texts or {}).get("section_order") or []
+    rank = {k: i for i, k in enumerate(seq) if k in SECTION_LABELS}
+    return sorted(SECTION_KEYS, key=lambda k: rank.get(k, len(rank)))
+
+
 def _effect_display(effect, effect_formats):
     """Returns (name, description) to show for an effect, or None to skip.
     Custom format text replaces the name and drops the description (the user's
@@ -1065,7 +1074,7 @@ def format_discord(parsed_data, classifications, flavor_texts=None, sections=Non
         "dss":       lambda: _section_dss_discord(parsed_data),
     }
     lines = [f"**Galactic War Update: {_build_sest_stamp()}**", ""]
-    for key in SECTION_KEYS:
+    for key in _ordered_sections(flavor_texts):
         if key in sections:
             lines.extend(renderers[key]())
     return "\n".join(lines)
@@ -1298,7 +1307,7 @@ def format_video(parsed_data, classifications, flavor_texts=None, sections=None)
         "planets":   lambda: _section_planets_video(parsed_data, classifications, flavor_texts),
         "dss":       lambda: _section_dss_video(parsed_data),
     }
-    for key in SECTION_KEYS:
+    for key in _ordered_sections(flavor_texts):
         if key in sections:
             lines.extend(renderers[key]())
     return "\n".join(lines)

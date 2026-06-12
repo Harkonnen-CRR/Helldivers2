@@ -239,6 +239,16 @@
       border-radius: 3px; padding: 2px 4px; cursor: pointer; white-space: nowrap;
     }
     .move-btn:hover { background: #1c2c26; border-color: #3a5a48; color: #adc; }
+    .move-btn:disabled { opacity: 0.3; cursor: default; }
+    .section-order-bar {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      justify-content: center; margin-bottom: 10px;
+    }
+    .section-order-label { font-size: 11px; color: #777; margin-right: 2px; }
+    .section-chip {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #b8c0b8;
+      background: #12150f; border: 1px solid #2a3024; border-radius: 4px; padding: 3px 6px;
+    }
     .remove-btn {
       font-size: 11px; line-height: 1; background: #251416; color: #c98; border: 1px solid #4a2a2a;
       border-radius: 3px; padding: 2px 6px; cursor: pointer; white-space: nowrap;
@@ -913,6 +923,7 @@
   <div style="display:flex;justify-content:center;margin-bottom:8px">
     <button id="reformat-btn" class="secondary" onclick="reformat()" style="display:none">↺ REFRESH TEXT</button>
   </div>
+  <div id="section-order-bar" class="section-order-bar"></div>
   <div class="outputs-row">
     <div class="section">
       <h3>Discord Post</h3>
@@ -1003,6 +1014,38 @@
 <script>
   const COUNTDOWN = 60;
   let countdownInterval = null;
+  const OUTPUT_SECTIONS = {{ output_sections | tojson }};  // [{key,label}] in default order
+
+  // "Post order" bar — re-typeset the broadcast by moving whole output sections.
+  function buildSectionOrder(flavor) {
+    const bar = document.getElementById('section-order-bar');
+    if (!bar) return;
+    const labels = {}; OUTPUT_SECTIONS.forEach(s => labels[s.key] = s.label);
+    const defaults = OUTPUT_SECTIONS.map(s => s.key);
+    let order = ((flavor && flavor.section_order) || []).filter(k => labels[k]);
+    defaults.forEach(k => { if (!order.includes(k)) order.push(k); });
+    bar.innerHTML = '<span class="section-order-label">Post order:</span>' + order.map((k, i) =>
+      `<span class="section-chip">
+        <button class="move-btn" onclick="moveSection('${k}', -1)" ${i === 0 ? 'disabled' : ''} title="Move earlier">◀</button>
+        <span>${escHtml(labels[k])}</span>
+        <button class="move-btn" onclick="moveSection('${k}', 1)" ${i === order.length - 1 ? 'disabled' : ''} title="Move later">▶</button>
+      </span>`).join('');
+  }
+
+  async function moveSection(key, dir) {
+    const res = await fetch('/move_section', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, dir }),
+    });
+    const data = await res.json();
+    if (data.status !== 'ok') return;
+    if (typeof data.discord === 'string') {
+      document.getElementById('out-discord').value = data.discord;
+      document.getElementById('out-video').value = data.video;
+      updateCharCount();
+    }
+    buildSectionOrder(data.flavor);
+  }
 
   // Search state per output panel
   const searchState = {
@@ -1053,6 +1096,7 @@
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
     buildFlavorEditor(data.theaters, data.flavor);
     populatePlanetSearch(data.all_planets);
+    buildSectionOrder(data.flavor);
 
     if (data.stale) {
       // API down — board served from cached data. No live liberation rates; skip the
