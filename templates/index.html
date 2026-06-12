@@ -1094,7 +1094,7 @@
     buildOrdersPanel(data.orders || [], data.flavor);
     buildSpecialEventsPanel(data.orders || [], data.flavor);
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
-    buildFlavorEditor(data.theaters, data.flavor);
+    buildFlavorEditor(data.theaters, data.flavor, data.dss);
     populatePlanetSearch(data.all_planets);
     buildSectionOrder(data.flavor);
 
@@ -1179,7 +1179,7 @@
     buildOrdersPanel(data.orders || [], data.flavor);
     buildSpecialEventsPanel(data.orders || [], data.flavor);
     buildSpecialEventsLog((data.flavor || {}).special_events_log || []);
-    buildFlavorEditor(data.theaters, data.flavor);
+    buildFlavorEditor(data.theaters, data.flavor, data.dss);
   }
 
   function cancelRefresh() {
@@ -1652,7 +1652,7 @@
 
   // Re-render the editor + output boxes from a /pin_planet or /remove_planet response.
   function applyPinResponse(data) {
-    if (data.theaters) buildFlavorEditor(data.theaters, data.flavor);
+    if (data.theaters) buildFlavorEditor(data.theaters, data.flavor, data.dss);
     if (typeof data.discord === 'string') {
       document.getElementById('out-discord').value = data.discord;
       document.getElementById('out-video').value = data.video;
@@ -2479,7 +2479,7 @@
 
   // ── Flavor editor ─────────────────────────────────────────────
 
-  function buildFlavorEditor(theaters, flavor) {
+  function buildFlavorEditor(theaters, flavor, dss) {
     if (!theaters || theaters.length === 0) return;
 
     const section = document.getElementById('flavor-section');
@@ -2591,6 +2591,19 @@
       container.appendChild(card);
     }
 
+    // DSS fallback: if its orbiting planet isn't on the board, it can't attach to a card —
+    // show it as its own standalone panel so it never disappears.
+    if (dss && dss.planet_index !== undefined) {
+      const onBoard = theaters.some(t => t.planets.some(p => p.index === dss.planet_index));
+      if (!onBoard) {
+        const panel = document.createElement('div');
+        panel.className = 'theater-card';
+        panel.innerHTML = `<div class="theater-card-header"><span>DEMOCRACY SPACE STATION</span></div>
+          <div class="theater-card-body open" style="padding:10px">${dssBlockHtml(dss, true)}</div>`;
+        container.appendChild(panel);
+      }
+    }
+
     // Wire up auto-save and clear/undo for all flavor textareas
     container.querySelectorAll('textarea[data-scope]').forEach(ta => {
       ta.addEventListener('input', () => saveFlavor(ta.dataset.scope, ta.dataset.key, ta.value));
@@ -2648,6 +2661,20 @@
     ta.after(bar);
   }
 
+  // DSS block — attached under its planet (standalone=false) or as its own fallback panel
+  // (standalone=true, when the orbiting planet isn't on the board).
+  function dssBlockHtml(dss, standalone) {
+    const label = standalone
+      ? `⊙ DSS Status — in orbit of ${escHtml(dss.planet_name)}${dss.ftl_jump ? ` (${escHtml(dss.ftl_jump)} until FTL jump)` : ''}`
+      : `⊙ DSS in Orbit${dss.ftl_jump ? ` — ${escHtml(dss.ftl_jump)} until FTL jump` : ''}`;
+    const actions = dss.actions.map(a => {
+      const cost = a.cost_label ? ` (${escHtml(a.cost_label)})` : '';
+      const desc = a.description ? `<div class="ref-dss-action-desc">│ ${escHtml(a.description)}</div>` : '';
+      return `<div class="ref-dss-action ${escHtml(a.status)}"><strong>${escHtml(a.name)}</strong>${cost} — ${escHtml(a.phrase)}</div>${desc}`;
+    }).join('');
+    return `<div class="ref-dss"><div class="ref-dss-label">${label}</div>${actions}</div>`;
+  }
+
   function buildRefPanelHTML(theater, planetNotes, pinnedPlanets) {
     let html = '';
     pinnedPlanets = pinnedPlanets || [];
@@ -2655,14 +2682,7 @@
 
     // DSS reference block — rendered UNDER its orbiting planet's card (not the theater bottom).
     const dss = theater.dss;
-    const dssBlock = dss ? `<div class="ref-dss">
-        <div class="ref-dss-label">⊙ DSS in Orbit${dss.ftl_jump ? ` — ${escHtml(dss.ftl_jump)} until FTL jump` : ''}</div>
-        ${dss.actions.map(a => {
-          const cost = a.cost_label ? ` (${escHtml(a.cost_label)})` : '';
-          const desc = a.description ? `<div class="ref-dss-action-desc">│ ${escHtml(a.description)}</div>` : '';
-          return `<div class="ref-dss-action ${escHtml(a.status)}"><strong>${escHtml(a.name)}</strong>${cost} — ${escHtml(a.phrase)}</div>${desc}`;
-        }).join('')}
-      </div>` : '';
+    const dssBlock = dss ? dssBlockHtml(dss, false) : '';
 
     for (const p of theater.planets) {
       const hazardLines = p.hazards.map(h =>
