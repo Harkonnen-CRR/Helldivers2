@@ -7,9 +7,10 @@ from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, render_template, request
 
 import wiki_lore
+import gambit
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all, build_planet_by_index, list_all_planets, top_populated_indices
-from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, get_dss_ref, _detected_equipment, SECTION_KEYS
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, get_dss_ref, _detected_equipment, _time_remaining_hours, SECTION_KEYS
 
 app = Flask(__name__)
 
@@ -303,6 +304,21 @@ def _cache_updated_str():
         return "unknown"
 
 
+def _attach_gambit_projections(parsed, window_seconds):
+    """Attach a gambit.project_gambit() viability dict to each surfaced gambit in
+    parsed['gambits'], using the attacker's two-snapshot throughput (snapshot1_health vs
+    current) and the defender's defense deadline. Needs both planets to be in the built set."""
+    by_index = {p["index"]: p for p in parsed.get("planets", [])}
+    for g in parsed.get("gambits", []):
+        defender, attacker = by_index.get(g["defender"]), by_index.get(g["attacker"])
+        if not (defender and attacker):
+            continue
+        atk_h1 = state["snapshot1_health"].get(g["attacker"])
+        dleft_h = _time_remaining_hours((defender.get("event") or {}).get("end_time"))
+        dleft_sec = dleft_h * 3600 if dleft_h is not None else None
+        g["projection"] = gambit.project_gambit(defender, attacker, atk_h1, window_seconds, dleft_sec)
+
+
 @app.route("/refresh", methods=["POST"])
 def refresh():
     stale = False
@@ -415,6 +431,10 @@ def fetch2():
                     if net_rate > 0 and remaining > 0:
                         region["liberation_time_hours"] = remaining / net_rate / 3600
                         region["region_losing"] = True
+
+    # Gambit viability projection (N2): attach to each surfaced gambit using the two-snapshot
+    # attacker throughput + the defender's defense deadline.
+    _attach_gambit_projections(parsed, elapsed)
 
     state["last_parsed"] = parsed
     merged = _merged_flavor()
