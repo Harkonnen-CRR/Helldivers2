@@ -574,14 +574,13 @@ def _gambit_viability_line(projection, defender_name, attacker_name):
         return "⚑ Defense window has closed"
     if status != "ok":
         return "⚑ Viability: awaiting field data"
-    add = round(v.get("additional_needed", 0))
     if v.get("winnable"):
-        if add <= 0:
-            return "✓ WINNABLE — current Helldivers are on pace to take it in time"
-        return f"✓ WINNABLE — mobilize ~{add:,} Helldivers from {defender_name} → {attacker_name}"
-    short = round(v.get("shortfall", 0))
-    return (f"✗ Not winnable — needs ~{add:,} more on {attacker_name} "
-            f"(short ~{short:,} even if all of {defender_name} switches)")
+        return "✓ WINNABLE — current Helldivers are on pace to take it in time"
+    add = round(v.get("additional_needed", 0))
+    line = f"✗ Not winnable — needs ~{add:,} more Helldivers on {attacker_name} to win in time"
+    if v.get("mobilizable"):
+        line += f" (within reach if {defender_name} mobilizes)"
+    return line
 
 
 def _gambit_defender_status(d):
