@@ -398,6 +398,7 @@
     .tg-viability { font-size: 11px; margin: 1px 0 5px; color: #b0a878; }
     .tg-viability.winnable { color: #6ad08a; font-weight: bold; }
     .tg-viability.unwinnable { color: #d08a8a; }
+    .tg-viability.stalled { color: #e0a830; font-weight: bold; }
     .custom-planet-check.off-update { opacity: 0.85; }
     .off-update-tag { color: #a05050; font-style: italic; font-size: 10px; }
     /* Special Events Log */
@@ -2564,7 +2565,7 @@
           theater.gambits.map(g =>
             `<div class="tg-row"><span class="tg-def">Defending:</span> ${escHtml(g.defender_name)} — ${escHtml(g.defender_players)} players — ${escHtml(g.defender_status)}</div>` +
             `<div class="tg-row"><span class="tg-atk">Attacking:</span> ${escHtml(g.attacker_name)} — ${escHtml(g.attacker_players)} players — ${escHtml(g.attacker_status)}</div>` +
-            (g.viability ? `<div class="tg-viability${g.viability.startsWith('✓') ? ' winnable' : (g.viability.startsWith('✗') ? ' unwinnable' : '')}">${escHtml(g.viability)}</div>` : '')
+            (g.viability ? `<div class="tg-viability${g.viability.startsWith('✓') ? ' winnable' : (g.viability.startsWith('✗') ? ' unwinnable' : (g.viability.startsWith('⚠') ? ' stalled' : ''))}">${escHtml(g.viability)}</div>` : '')
           ).join('') + '</div>'
         : '';
       writePanel.innerHTML = `

@@ -572,6 +572,8 @@ def _gambit_viability_line(projection, defender_name, attacker_name):
     status = v.get("status")
     if status == "window_closed":
         return "⚑ Defense window has closed"
+    if status == "stalled":
+        return "⚠ Progress stalled — more reinforcements urgently needed"
     if status != "ok":
         return "⚑ Viability: awaiting field data"
     if v.get("winnable"):

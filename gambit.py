@@ -14,12 +14,18 @@ more divers help super-linearly):
     players_needed    = (atk_remaining_hp / defense_time_left + atk_regen_per_sec) / per_diver
     additional_needed = players_needed - atk_players
 
-The realistic mobilizable pool is the DEFENDING planet's divers (switching them to the attacker
-is exactly what wins the defense), so the gambit is WINNABLE iff additional_needed <= def_players.
-If not, the shortfall beyond even full mobilization is additional_needed - def_players.
+WINNABLE means the attacker's CURRENT divers already suffice: additional_needed <= 0 (user-
+corrected 2026-06-13: "winnable means winnable with current numbers"). When not winnable we
+state the deficit ("needs ~N more"); a SECONDARY hint, mobilizable = additional_needed <=
+def_players, notes whether switching the defending planet's divers onto the attacker (exactly
+what wins the defense) could cover that gap.
 
-`players_needed` is always finite (gross scales with players, regen is fixed), so there is never
-a "not viable" dead end — we can always state a concrete "needs X more".
+Edge case — STALLED: the whole calculation needs a real per-diver damage rate, which requires
+the attacker to actually be losing HP. If the window shows no meaningful HP loss (net drop <= 0,
+e.g. a Gloom world pinned at full HP where current divers only cancel regen), per-diver
+throughput is unmeasurable and any "players_needed" would be garbage (deceptively low). In that
+case project_gambit returns status "stalled" with no numbers — the display reads "Progress
+stalled — more reinforcements urgently needed."
 """
 
 
@@ -67,17 +73,27 @@ def project_gambit(defender, attacker, atk_health1, window_seconds, defense_time
     """Full projection for one gambit pair from the two-snapshot data. `defender`/`attacker`
     are built planet dicts; `atk_health1` is the attacker's snapshot-1 contested health.
     Returns {defense_time_left_sec, attacker_lib_hours, viability:{...}}."""
-    gross = (attacker_gross_rate(atk_health1, attacker.get("contest_health"),
+    atk_h2 = attacker.get("contest_health")
+    # Net HP actually lost over the window (regen-inclusive). If the planet isn't meaningfully
+    # losing HP, per-diver throughput is unmeasurable and any "players_needed" is fabricated —
+    # report it as stalled instead (see gambit_viability "stalled" status).
+    net_drop_per_sec = None
+    if atk_health1 is not None and atk_h2 is not None and window_seconds and window_seconds > 0:
+        net_drop_per_sec = (atk_health1 - atk_h2) / window_seconds
+    gross = (attacker_gross_rate(atk_health1, atk_h2,
                                  attacker.get("regen_per_second") or 0, window_seconds)
              if atk_health1 is not None else None)
-    viability = gambit_viability(
-        atk_remaining_hp=attacker.get("contest_health"),
-        atk_gross_rate=gross,
-        atk_players=attacker.get("player_count"),
-        atk_regen_per_sec=attacker.get("regen_per_second") or 0,
-        def_players=defender.get("player_count"),
-        defense_time_left_sec=defense_time_left_sec,
-    )
+    if net_drop_per_sec is not None and net_drop_per_sec <= 0:
+        viability = {"status": "stalled"}
+    else:
+        viability = gambit_viability(
+            atk_remaining_hp=atk_h2,
+            atk_gross_rate=gross,
+            atk_players=attacker.get("player_count"),
+            atk_regen_per_sec=attacker.get("regen_per_second") or 0,
+            def_players=defender.get("player_count"),
+            defense_time_left_sec=defense_time_left_sec,
+        )
     return {
         "defense_time_left_sec": defense_time_left_sec,
         "attacker_lib_hours": attacker.get("liberation_time_hours"),
