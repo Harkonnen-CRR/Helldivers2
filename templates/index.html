@@ -395,6 +395,9 @@
     .tg-row { font-size: 11px; color: #c8b070; margin-bottom: 2px; }
     .tg-def { color: #ffb060; font-weight: bold; }
     .tg-atk { color: #ffd060; font-weight: bold; }
+    .tg-viability { font-size: 11px; margin: 1px 0 5px; color: #b0a878; }
+    .tg-viability.winnable { color: #6ad08a; font-weight: bold; }
+    .tg-viability.unwinnable { color: #d08a8a; }
     .custom-planet-check.off-update { opacity: 0.85; }
     .off-update-tag { color: #a05050; font-style: italic; font-size: 10px; }
     /* Special Events Log */
@@ -2560,7 +2563,8 @@
         ? '<div class="theater-gambits"><div class="theater-gambits-label">&#9876; Gambits</div>' +
           theater.gambits.map(g =>
             `<div class="tg-row"><span class="tg-def">Defending:</span> ${escHtml(g.defender_name)} — ${escHtml(g.defender_players)} players — ${escHtml(g.defender_status)}</div>` +
-            `<div class="tg-row"><span class="tg-atk">Attacking:</span> ${escHtml(g.attacker_name)} — ${escHtml(g.attacker_players)} players — ${escHtml(g.attacker_status)}</div>`
+            `<div class="tg-row"><span class="tg-atk">Attacking:</span> ${escHtml(g.attacker_name)} — ${escHtml(g.attacker_players)} players — ${escHtml(g.attacker_status)}</div>` +
+            (g.viability ? `<div class="tg-viability${g.viability.startsWith('✓') ? ' winnable' : (g.viability.startsWith('✗') ? ' unwinnable' : '')}">${escHtml(g.viability)}</div>` : '')
           ).join('') + '</div>'
         : '';
       writePanel.innerHTML = `
