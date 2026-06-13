@@ -60,3 +60,25 @@ def gambit_viability(*, atk_remaining_hp, atk_gross_rate, atk_players, atk_regen
         "additional_needed": max(0.0, additional_needed),
         "shortfall": max(0.0, additional_needed - (def_players or 0)),  # beyond full mobilization
     }
+
+
+def project_gambit(defender, attacker, atk_health1, window_seconds, defense_time_left_sec):
+    """Full projection for one gambit pair from the two-snapshot data. `defender`/`attacker`
+    are built planet dicts; `atk_health1` is the attacker's snapshot-1 contested health.
+    Returns {defense_time_left_sec, attacker_lib_hours, viability:{...}}."""
+    gross = (attacker_gross_rate(atk_health1, attacker.get("contest_health"),
+                                 attacker.get("regen_per_second") or 0, window_seconds)
+             if atk_health1 is not None else None)
+    viability = gambit_viability(
+        atk_remaining_hp=attacker.get("contest_health"),
+        atk_gross_rate=gross,
+        atk_players=attacker.get("player_count"),
+        atk_regen_per_sec=attacker.get("regen_per_second") or 0,
+        def_players=defender.get("player_count"),
+        defense_time_left_sec=defense_time_left_sec,
+    )
+    return {
+        "defense_time_left_sec": defense_time_left_sec,
+        "attacker_lib_hours": attacker.get("liberation_time_hours"),
+        "viability": viability,
+    }
