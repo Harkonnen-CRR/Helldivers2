@@ -52,13 +52,14 @@ def gambit_viability(*, atk_remaining_hp, atk_gross_rate, atk_players, atk_regen
     needed_net_rate = atk_remaining_hp / defense_time_left_sec      # HP/sec required to finish in time
     players_needed = (needed_net_rate + (atk_regen_per_sec or 0)) / per_diver
     additional_needed = players_needed - atk_players
-    winnable = additional_needed <= (def_players or 0)
     return {
         "status": "ok",
-        "winnable": winnable,
+        # WINNABLE = the attacker's CURRENT divers are enough to liberate it before the deadline.
+        "winnable": additional_needed <= 0,
         "players_needed": players_needed,
-        "additional_needed": max(0.0, additional_needed),
-        "shortfall": max(0.0, additional_needed - (def_players or 0)),  # beyond full mobilization
+        "additional_needed": max(0.0, additional_needed),   # more divers needed on the attacker to win
+        # secondary realism hint: could moving the defending planet's divers cover that deficit?
+        "mobilizable": additional_needed <= (def_players or 0),
     }
 
 
