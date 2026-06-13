@@ -559,8 +559,29 @@ def _gambit_summaries(parsed_data):
         d = by_index.get(g["defender"])
         a = by_index.get(g["attacker"])
         if d and a:
-            out.append({"faction": _enemy_faction(d), "defender": d, "attacker": a})
+            out.append({"faction": _enemy_faction(d), "defender": d, "attacker": a,
+                        "projection": g.get("projection")})
     return out
+
+
+def _gambit_viability_line(projection, defender_name, attacker_name):
+    """Readable one-line verdict for a gambit's viability projection ('' if none yet)."""
+    if not projection:
+        return ""
+    v = projection.get("viability") or {}
+    status = v.get("status")
+    if status == "window_closed":
+        return "⚑ Defense window has closed"
+    if status != "ok":
+        return "⚑ Viability: awaiting field data"
+    add = round(v.get("additional_needed", 0))
+    if v.get("winnable"):
+        if add <= 0:
+            return "✓ WINNABLE — current Helldivers are on pace to take it in time"
+        return f"✓ WINNABLE — mobilize ~{add:,} Helldivers from {defender_name} → {attacker_name}"
+    short = round(v.get("shortfall", 0))
+    return (f"✗ Not winnable — needs ~{add:,} more on {attacker_name} "
+            f"(short ~{short:,} even if all of {defender_name} switches)")
 
 
 def _gambit_defender_status(d):
@@ -582,7 +603,10 @@ def _gambit_block_discord(faction, summaries):
         d, a = s["defender"], s["attacker"]
         lines.append(f"> **Defending:** {d['name']} — {d['player_count']:,} players — {_gambit_defender_status(d)}")
         lines.append(f"> **Attacking:** {a['name']} — {a['player_count']:,} players — {_gambit_attacker_status(a)}")
-    lines.append("")
+        vline = _gambit_viability_line(s.get("projection"), d["name"], a["name"])
+        if vline:
+            lines.append(f"> {vline}")
+        lines.append("")
     return lines
 
 
@@ -595,7 +619,10 @@ def _gambit_block_video(faction, summaries):
         d, a = s["defender"], s["attacker"]
         lines.append(f"  DEFENDING: {d['name'].upper()} — {d['player_count']:,} players — {_gambit_defender_status(d)}")
         lines.append(f"  ATTACKING: {a['name'].upper()} — {a['player_count']:,} players — {_gambit_attacker_status(a)}")
-    lines.append("")
+        vline = _gambit_viability_line(s.get("projection"), d["name"], a["name"])
+        if vline:
+            lines.append(f"  {vline}")
+        lines.append("")
     return lines
 
 
@@ -1537,6 +1564,7 @@ def get_theater_data(parsed_data, classifications=None, planet_modifiers=None,
                 "attacker_name": a["name"],
                 "attacker_players": f"{a['player_count']:,}",
                 "attacker_status": _gambit_attacker_status(a),
+                "viability": _gambit_viability_line(s.get("projection"), d["name"], a["name"]),
             })
 
         result.append({
