@@ -570,16 +570,22 @@ def get_gambit_monitor_data(parsed_data):
     Helldivers on pace — sort first and carry winnable=True so the UI can flag them, including
     ones the per-theater display gate filtered out. Populated from parsed['gambit_monitor']
     (projections attached in main.fetch2); empty until the two-snapshot has run."""
+    # in_update reflects the EFFECTIVE board (auto − removed ∪ added), not the raw auto-pull, so
+    # the monitor's tag + add/remove button track what's actually in the broadcast (N2 step5).
+    effective = {(g["defender"], g["attacker"]) for g in parsed_data.get("gambits", [])}
     out = []
     for m in parsed_data.get("gambit_monitor", []):
         v = (m.get("projection") or {}).get("viability") or {}
         out.append({
+            "key": f'{m["defender"]}_{m["attacker"]}',
+            "defender": m["defender"],
+            "attacker": m["attacker"],
             "defender_name": m["defender_name"],
             "attacker_name": m["attacker_name"],
             "defender_players": m.get("defender_players") or 0,
             "attacker_players": m.get("attacker_players") or 0,
             "faction": m.get("faction"),
-            "surfaced": bool(m.get("surfaced")),
+            "in_update": (m["defender"], m["attacker"]) in effective,
             "winnable": bool(v.get("winnable")),
             "status": v.get("status"),
             "viability": _gambit_viability_line(m.get("projection"), m["defender_name"], m["attacker_name"]),
