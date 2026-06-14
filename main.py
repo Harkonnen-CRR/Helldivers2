@@ -10,7 +10,7 @@ import wiki_lore
 import gambit
 from api_client import fetch_all, ping, ApiError
 from data_parser import parse_all, build_planet_by_index, list_all_planets, top_populated_indices
-from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, get_dss_ref, _detected_equipment, _time_remaining_hours, SECTION_KEYS
+from formatter import format_discord, format_video, get_theater_data, get_modifier_panel_data, get_output_sections, get_effects_panel_data, get_dss_ref, get_gambit_monitor_data, _detected_equipment, _time_remaining_hours, SECTION_KEYS
 
 app = Flask(__name__)
 
@@ -319,6 +319,29 @@ def _attach_gambit_projections(parsed, window_seconds):
         g["projection"] = gambit.project_gambit(defender, attacker, atk_h1, window_seconds, dleft_sec)
 
 
+def _attach_gambit_monitor(parsed, window_seconds):
+    """N2 step4: project EVERY raw gambit pair (parsed['all_gambits']), not just the surfaced one
+    per theater, so a winnable gambit the display gate filtered out is still flagged. Each pair's
+    built planet dicts come from parse_all(), so no file re-reads here. Stores
+    parsed['gambit_monitor'] = [{names, players, faction, surfaced, projection}]."""
+    monitor = []
+    for g in parsed.get("all_gambits", []):
+        defender, attacker = g["defender_planet"], g["attacker_planet"]
+        atk_h1 = state["snapshot1_health"].get(g["attacker"])
+        dleft_h = _time_remaining_hours((defender.get("event") or {}).get("end_time"))
+        dleft_sec = dleft_h * 3600 if dleft_h is not None else None
+        monitor.append({
+            "defender_name": defender["name"],
+            "attacker_name": attacker["name"],
+            "defender_players": defender.get("player_count"),
+            "attacker_players": attacker.get("player_count"),
+            "faction": g["faction"],
+            "surfaced": g["surfaced"],
+            "projection": gambit.project_gambit(defender, attacker, atk_h1, window_seconds, dleft_sec),
+        })
+    parsed["gambit_monitor"] = monitor
+
+
 @app.route("/refresh", methods=["POST"])
 def refresh():
     stale = False
@@ -435,6 +458,7 @@ def fetch2():
     # Gambit viability projection (N2): attach to each surfaced gambit using the two-snapshot
     # attacker throughput + the defender's defense deadline.
     _attach_gambit_projections(parsed, elapsed)
+    _attach_gambit_monitor(parsed, elapsed)
 
     state["last_parsed"] = parsed
     merged = _merged_flavor()
@@ -454,6 +478,7 @@ def fetch2():
         "detected_equipment": _detected_equipment(parsed),
         "modifier_panel": modifier_panel,
         "effects_panel": get_effects_panel_data(parsed, merged),
+        "gambit_monitor": get_gambit_monitor_data(parsed),
         "dispatches": parsed.get("dispatches", []),
         "orders": parsed.get("orders", []),
         "flavor": merged,

@@ -402,8 +402,9 @@ def parse_all():
     def _attacker_pop(g):
         return planets_by_index[g["attacker"]]["statistics"]["playerCount"]
 
+    raw_gambits = _build_gambits(planets_by_index, campaign_indices)
     gambits_by_theater = {}
-    for g in _build_gambits(planets_by_index, campaign_indices):
+    for g in raw_gambits:
         faction = (planets_by_index[g["defender"]].get("event") or {}).get("faction")
         gambits_by_theater.setdefault(faction, []).append(g)
 
@@ -445,6 +446,23 @@ def parse_all():
             pl["gambit"] = gambit_by_index[idx]
         planets.append(pl)
 
+    # All-gambits monitor (N2 step4): EVERY raw gambit pair (pre per-theater 40% filter), with
+    # built defender/attacker dicts so main.py can attach viability projections without re-reading
+    # files. `surfaced` = this pair is the one shown for its theater (in `gambits`). Lets a winnable
+    # gambit the display gate filtered out still get flagged on the tracking screen.
+    surfaced_keys = {(g["defender"], g["attacker"]) for g in gambits}
+    all_gambits = [
+        {
+            "defender": g["defender"],
+            "attacker": g["attacker"],
+            "defender_planet": _build_planet(planets_by_index[g["defender"]], campaigns_by_index, effects_by_index),
+            "attacker_planet": _build_planet(planets_by_index[g["attacker"]], campaigns_by_index, effects_by_index),
+            "faction": (planets_by_index[g["defender"]].get("event") or {}).get("faction"),
+            "surfaced": (g["defender"], g["attacker"]) in surfaced_keys,
+        }
+        for g in raw_gambits
+    ]
+
     return {
         "planets": planets,
         "orders": _build_orders(assignments_data),
@@ -453,6 +471,7 @@ def parse_all():
         "dispatches": _build_dispatches(dispatches_data),
         "all_effects_by_index": effects_by_index,  # galaxy-wide, for the effects editor/flag area
         "gambits": gambits,
+        "all_gambits": all_gambits,
         "meta": {"impact_multiplier": impact_multiplier},
     }
 

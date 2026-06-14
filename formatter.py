@@ -564,6 +564,31 @@ def _gambit_summaries(parsed_data):
     return out
 
 
+def get_gambit_monitor_data(parsed_data):
+    """N2 step4 tracking screen: a display row per RAW gambit pair (every possible gambit in the
+    galaxy, not just the prominent one per theater the update shows). Winnable pulls — current
+    Helldivers on pace — sort first and carry winnable=True so the UI can flag them, including
+    ones the per-theater display gate filtered out. Populated from parsed['gambit_monitor']
+    (projections attached in main.fetch2); empty until the two-snapshot has run."""
+    out = []
+    for m in parsed_data.get("gambit_monitor", []):
+        v = (m.get("projection") or {}).get("viability") or {}
+        out.append({
+            "defender_name": m["defender_name"],
+            "attacker_name": m["attacker_name"],
+            "defender_players": m.get("defender_players") or 0,
+            "attacker_players": m.get("attacker_players") or 0,
+            "faction": m.get("faction"),
+            "surfaced": bool(m.get("surfaced")),
+            "winnable": bool(v.get("winnable")),
+            "status": v.get("status"),
+            "viability": _gambit_viability_line(m.get("projection"), m["defender_name"], m["attacker_name"]),
+        })
+    # Winnable-now first, then by attacker turnout (the pull most likely to coordinate).
+    out.sort(key=lambda x: (not x["winnable"], -x["attacker_players"]))
+    return out
+
+
 def _gambit_viability_line(projection, defender_name, attacker_name):
     """Readable one-line verdict for a gambit's viability projection ('' if none yet)."""
     if not projection:
