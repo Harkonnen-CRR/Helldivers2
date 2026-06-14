@@ -28,6 +28,8 @@ _SESSION_DEFAULTS = {
     "planet_visibility": {},  # {str(planet_index): bool} — True by default (per-planet show/hide)
     "pinned_planets": [],     # [int index] planets the user added to the board (search/keep)
     "removed_planets": [],    # [int index] planets the user took off the board (incl. auto-pulled)
+    "added_gambits": [],      # ["{def}_{atk}"] gambits the user promoted from the monitor into the update
+    "removed_gambits": [],    # ["{def}_{atk}"] auto-surfaced gambits the user took out of the update
     "theater_order": [],      # [faction] manual front order (board reorder); unset = default
     "planet_order": [],       # [int index] manual planet order within fronts (board reorder)
     "section_order": [],      # [section_key] manual OUTPUT section order; unset = default
@@ -235,10 +237,44 @@ def _apply_board(parsed):
         if bp:
             bp["pinned"] = True
             extra.append(bp)
-    if not removed and not extra:
+
+    # Gambit entries (N2 step5): like planets, the auto-pull SEEDS the surfaced gambits and the
+    # user adjusts — displayed = (auto − removed) ∪ added. Added gambits come from the monitor
+    # (the full all_gambits set); their planets are injected as gambit_added so the GAMBITS block
+    # can render the pair without creating standalone cards.
+    removed_g = set(state["session"].get("removed_gambits") or [])
+    added_g = set(state["session"].get("added_gambits") or [])
+    def _gk(g):
+        return f'{g["defender"]}_{g["attacker"]}'
+    eff_gambits = [g for g in parsed.get("gambits", []) if _gk(g) not in removed_g]
+    present_g = {_gk(g) for g in eff_gambits}
+    all_by_key = {_gk(g): g for g in parsed.get("all_gambits", [])}
+    planet_idx_present = {p["index"] for p in base + extra}
+    gambit_inject = []
+    for key in added_g:
+        if key in present_g:
+            continue
+        ag = all_by_key.get(key)
+        if not ag:
+            continue
+        eff_gambits.append({"defender": ag["defender"], "attacker": ag["attacker"],
+                            "projection": ag.get("projection")})
+        present_g.add(key)
+        for role in ("defender_planet", "attacker_planet"):
+            bp = ag[role]
+            if bp["index"] not in planet_idx_present:
+                bp = dict(bp)
+                bp["gambit_added"] = True
+                gambit_inject.append(bp)
+                planet_idx_present.add(bp["index"])
+    gambits_changed = removed_g or added_g
+
+    if not removed and not extra and not gambits_changed:
         return parsed
     out = dict(parsed)
-    out["planets"] = base + extra
+    out["planets"] = base + extra + gambit_inject
+    if gambits_changed:
+        out["gambits"] = eff_gambits
     return out
 
 
@@ -273,6 +309,7 @@ def _board_response():
         "theaters": theaters,
         "dss": get_dss_ref(pp),
         "detected_equipment": _detected_equipment(pp),
+        "gambit_monitor": get_gambit_monitor_data(pp),
         "discord": format_discord(pp, state["classifications"], merged),
         "video": format_video(pp, state["classifications"], merged),
         "flavor": merged,
@@ -330,14 +367,18 @@ def _attach_gambit_monitor(parsed, window_seconds):
         atk_h1 = state["snapshot1_health"].get(g["attacker"])
         dleft_h = _time_remaining_hours((defender.get("event") or {}).get("end_time"))
         dleft_sec = dleft_h * 3600 if dleft_h is not None else None
+        proj = gambit.project_gambit(defender, attacker, atk_h1, window_seconds, dleft_sec)
+        g["projection"] = proj  # also on the all_gambits entry, so a promoted gambit carries viability
         monitor.append({
+            "defender": g["defender"],
+            "attacker": g["attacker"],
             "defender_name": defender["name"],
             "attacker_name": attacker["name"],
             "defender_players": defender.get("player_count"),
             "attacker_players": attacker.get("player_count"),
             "faction": g["faction"],
             "surfaced": g["surfaced"],
-            "projection": gambit.project_gambit(defender, attacker, atk_h1, window_seconds, dleft_sec),
+            "projection": proj,
         })
     parsed["gambit_monitor"] = monitor
 
@@ -478,7 +519,7 @@ def fetch2():
         "detected_equipment": _detected_equipment(parsed),
         "modifier_panel": modifier_panel,
         "effects_panel": get_effects_panel_data(parsed, merged),
-        "gambit_monitor": get_gambit_monitor_data(parsed),
+        "gambit_monitor": get_gambit_monitor_data(pp),
         "dispatches": parsed.get("dispatches", []),
         "orders": parsed.get("orders", []),
         "flavor": merged,
@@ -642,6 +683,37 @@ def remove_planet():
     removed = state["session"]["removed_planets"]
     if index not in removed:
         removed.append(index)
+    return jsonify(_board_response())
+
+
+@app.route("/add_gambit", methods=["POST"])
+def add_gambit():
+    """Promote a gambit from the monitor into the update (editor + output). Un-removes it if it
+    was an auto-surfaced one the user had taken out; otherwise records it as a user-added gambit.
+    `key` = '{defender_index}_{attacker_index}'. Returns the rebuilt board."""
+    key = (request.get_json() or {}).get("key")
+    if not key:
+        return jsonify({"status": "error", "message": "Missing gambit key"}), 400
+    if key in state["session"]["removed_gambits"]:
+        state["session"]["removed_gambits"].remove(key)
+    added = state["session"]["added_gambits"]
+    if key not in added:
+        added.append(key)
+    return jsonify(_board_response())
+
+
+@app.route("/remove_gambit", methods=["POST"])
+def remove_gambit():
+    """Take a gambit out of the update (auto-surfaced OR user-added). Persists across refreshes so
+    a removed auto gambit won't be re-seeded. `key` = '{defender_index}_{attacker_index}'."""
+    key = (request.get_json() or {}).get("key")
+    if not key:
+        return jsonify({"status": "error", "message": "Missing gambit key"}), 400
+    if key in state["session"]["added_gambits"]:
+        state["session"]["added_gambits"].remove(key)
+    removed = state["session"]["removed_gambits"]
+    if key not in removed:
+        removed.append(key)
     return jsonify(_board_response())
 
 

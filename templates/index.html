@@ -411,6 +411,12 @@
     .gm-tag { font-size: 9px; border-radius: 3px; padding: 0 4px; margin-left: 5px; }
     .gm-tag.shown { color: #6ac08a; border: 1px solid #3a5a3a; }
     .gm-tag.hidden { color: #998; border: 1px solid #444; }
+    .gm-actions { margin-top: 5px; }
+    .gm-btn { font-size: 10px; padding: 2px 8px; border-radius: 3px; cursor: pointer; background: #222; }
+    .gm-btn.gm-add { color: #6ad08a; border: 1px solid #3a5a3a; }
+    .gm-btn.gm-add:hover { background: #1c2c1c; }
+    .gm-btn.gm-remove { color: #d08a8a; border: 1px solid #5a3a3a; }
+    .gm-btn.gm-remove:hover { background: #2c1c1c; }
     .custom-planet-check.off-update { opacity: 0.85; }
     .off-update-tag { color: #a05050; font-style: italic; font-size: 10px; }
     /* Special Events Log */
@@ -1687,9 +1693,42 @@
     }
   }
 
+  async function addGambit(key) {
+    setStatus('Adding gambit…');
+    try {
+      const res = await fetch('/add_gambit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') { setStatus(data.message || 'Could not add gambit.'); return; }
+      applyPinResponse(data);
+      setStatus('Gambit added to the update.');
+    } catch (e) {
+      setStatus('Add gambit failed — see server log.');
+    }
+  }
+
+  async function removeGambit(key) {
+    setStatus('Removing gambit…');
+    try {
+      const res = await fetch('/remove_gambit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') { setStatus(data.message || 'Could not remove gambit.'); return; }
+      applyPinResponse(data);
+      setStatus('Gambit taken out of the update. (Re-add it from the Gambit Monitor.)');
+    } catch (e) {
+      setStatus('Remove gambit failed — see server log.');
+    }
+  }
+
   // Re-render the editor + output boxes from a /pin_planet or /remove_planet response.
   function applyPinResponse(data) {
     if (data.theaters) buildFlavorEditor(data.theaters, data.flavor, data.dss);
+    if (data.gambit_monitor) buildGambitMonitor(data.gambit_monitor);
     if (typeof data.discord === 'string') {
       document.getElementById('out-discord').value = data.discord;
       document.getElementById('out-video').value = data.video;
@@ -2407,12 +2446,17 @@
       const rowCls = r.winnable ? ' gm-winnable' : (r.status === 'stalled' ? ' gm-stalled' : '');
       const viaCls = r.winnable ? ' gm-v-winnable' : (r.status === 'stalled' ? ' gm-v-stalled' : '');
       const flag = r.winnable ? '<span class="gm-flag">✓ WINNABLE NOW</span>' : '';
-      const tag = r.surfaced ? '<span class="gm-tag shown">in update</span>'
-                             : '<span class="gm-tag hidden">not shown</span>';
+      const tag = r.in_update ? '<span class="gm-tag shown">in update</span>'
+                              : '<span class="gm-tag hidden">not shown</span>';
+      const key = escHtml(r.key);
+      const btn = r.in_update
+        ? `<button class="gm-btn gm-remove" onclick="removeGambit('${key}')">− Remove</button>`
+        : `<button class="gm-btn gm-add" onclick="addGambit('${key}')">+ Add to update</button>`;
       return `<div class="gm-row${rowCls}">
         <div class="gm-head">${flag}<strong>${escHtml(r.attacker_name)}</strong> → defends ${escHtml(r.defender_name)}${tag}</div>
         <div class="gm-sub">ATK ${Number(r.attacker_players).toLocaleString()} • DEF ${Number(r.defender_players).toLocaleString()} Helldivers</div>
         ${r.viability ? `<div class="gm-via${viaCls}">${escHtml(r.viability)}</div>` : ''}
+        <div class="gm-actions">${btn}</div>
       </div>`;
     }).join('');
   }
